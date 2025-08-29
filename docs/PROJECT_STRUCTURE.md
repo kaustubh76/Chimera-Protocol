@@ -199,35 +199,7 @@ chimera-protocol/
 │   ├── 🧪 tests/                        # SDK tests
 │   ├── 📦 package.json                  # SDK dependencies
 │   └── 📚 README.md                     # SDK documentation
-│
-├── 🏗️ infrastructure/                   # Infrastructure as code
-│   ├── ☁️ aws/                          # AWS infrastructure
-│   │   ├── cloudformation/              # CloudFormation templates
-│   │   └── terraform/                   # Terraform configurations
-│   │
-│   ├── 🐳 docker/                       # Docker configurations
-│   │   ├── Dockerfile.frontend          # Frontend container
-│   │   ├── Dockerfile.backend           # Backend container
-│   │   └── docker-compose.yml           # Multi-container setup
-│   │
-│   └── 🔧 kubernetes/                   # Kubernetes manifests
-│       ├── deployments/                 # Application deployments
-│       ├── services/                    # Service definitions
-│       └── ingress/                     # Ingress configurations
-│
-├── 📊 monitoring/                       # Monitoring and observability
-│   ├── 📈 grafana/                      # Grafana dashboards
-│   │   ├── dashboards/                  # Dashboard definitions
-│   │   └── datasources/                 # Data source configs
-│   │
-│   ├── 🔍 prometheus/                   # Prometheus configuration
-│   │   ├── rules/                       # Alerting rules
-│   │   └── targets/                     # Monitoring targets
-│   │
-│   └── 📝 logs/                         # Log management
-│       ├── logstash/                    # Logstash configuration
-│       └── elasticsearch/               # Elasticsearch setup
-│
+|
 ├── 📋 deployments/                      # Deployment records
 │   ├── 🏠 local.json                    # Local deployment info
 │   ├── 🧪 fhenixHelium.json             # Testnet deployment info

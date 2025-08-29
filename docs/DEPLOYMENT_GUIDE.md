@@ -1,867 +1,1074 @@
-# Chimera Deployment Guide
+# Chimera Protocol - Deployment Guide
 
-## 🚀 Complete Deployment & Testing Flow
+## 🚀 Complete Deployment Documentation
 
-This guide covers the complete deployment process from development to production.
+This guide covers all deployment scenarios for Chimera Protocol, from local development to mainnet production deployment.
 
-## 📋 Pre-Deployment Checklist
+---
 
-### Environment Setup
+## 📋 Table of Contents
+
+1. [Prerequisites](#1-prerequisites)
+2. [Local Development Deployment](#2-local-development-deployment)
+3. [Testnet Deployment](#3-testnet-deployment)
+4. [Mainnet Deployment](#4-mainnet-deployment)
+5. [Verification & Monitoring](#5-verification--monitoring)
+6. [Troubleshooting](#6-troubleshooting)
+
+---
+
+## 1. Prerequisites
+
+### 1.1 System Requirements
+
 ```bash
-# 1. Verify all dependencies
-node --version          # >= 18.0.0
-npm --version          # >= 8.0.0
-forge --version        # >= 0.2.0
-fhenix --version       # >= 1.0.0
+# Required software versions
+Node.js >= 18.0.0
+npm >= 8.0.0
+Git >= 2.30.0
 
-# 2. Environment variables
-cat > .env << EOF
+# Hardware requirements (for local development)
+RAM: 8GB minimum, 16GB recommended
+Storage: 50GB free space
+CPU: 4 cores minimum
+```
+
+### 1.2 Installation Setup
+
+```bash
+# Install Node.js and npm
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# Install Foundry
+curl -L https://foundry.paradigm.xyz | bash
+foundryup
+
+# Install Hardhat globally
+npm install -g hardhat
+
+# Install Fhenix CLI
+npm install -g @fhenixprotocol/fhenix-cli
+
+# Verify installations
+node --version    # >= 18.0.0
+npm --version     # >= 8.0.0
+forge --version   # Latest
+fhenix --version  # Latest
+```
+
+### 1.3 Project Setup
+
+```bash
+# Clone repository
+git clone https://github.com/ChimeraProtocol/chimera-core.git
+cd chimera-core
+
+# Install dependencies
+npm install
+
+# Install Foundry dependencies
+forge install
+
+# Compile contracts
+npm run build
+
+# Run tests to verify setup
+npm test
+```
+
+### 1.4 Environment Configuration
+
+```bash
+# Copy environment template
+cp .env.example .env
+
+# Edit environment variables
+nano .env
+```
+
+**Required Environment Variables:**
+```bash
 # Network Configuration
 FHENIX_RPC_URL=https://api.helium.fhenix.zone
 FHENIX_PRIVATE_KEY=your_private_key_here
-UNISWAP_V4_FACTORY=0x...
-UNISWAP_V4_POOL_MANAGER=0x...
-
-# Contract Addresses (fill after deployment)
-ENCRYPTED_ALPHA_HOOK=
-DARK_POOL_ENGINE=
-STRATEGY_WEAVER=
-RISK_MANAGER=
+ETHEREUM_RPC_URL=https://mainnet.infura.io/v3/your_key
 
 # API Keys
-FHENIX_API_KEY=your_api_key
+FHENIX_API_KEY=your_fhenix_api_key
 INFURA_API_KEY=your_infura_key
-ALCHEMY_API_KEY=your_alchemy_key
+ETHERSCAN_API_KEY=your_etherscan_key
 
 # Security
 DEPLOYER_PRIVATE_KEY=your_deployer_key
 MULTISIG_ADDRESS=0x...
-TIMELOCK_DELAY=172800  # 48 hours
-EOF
+TIMELOCK_DELAY=172800
 
-# 3. Install dependencies
-npm install
+# Optional: Monitoring
+DISCORD_WEBHOOK=your_discord_webhook
+SLACK_WEBHOOK=your_slack_webhook
 ```
-
-### Security Audit Checklist
-- [ ] Smart contract security audit completed
-- [ ] Fhenix encryption implementation reviewed
-- [ ] Access control mechanisms verified
-- [ ] Emergency pause functionality tested
-- [ ] Upgrade mechanisms secured
-- [ ] Multi-signature wallet configured
-
-## 🏗️ Phase 1: Local Development Deployment
-
-### Step 1: Setup Local Fhenix Node
-```bash
-# Clone Fhenix local testnet
-git clone https://github.com/FhenixProtocol/fhenix-localnet.git
-cd fhenix-localnet
-
-# Start local Fhenix network
-docker-compose up -d
-
-# Verify network is running
-curl -X POST -H "Content-Type: application/json" \
-  --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' \
-  http://localhost:8545
-```
-
-### Step 2: Deploy Core Contracts
-```bash
-# Create deployment script
-cat > scripts/deploy-local.js << 'EOF'
-const { ethers } = require("hardhat");
-const { FhenixClient } = require("@fhenixprotocol/fhenix.js");
-
-async function main() {
-    console.log("🚀 Starting Chimera local deployment...");
-    
-    // Get deployer
-    const [deployer] = await ethers.getSigners();
-    console.log("Deploying with account:", deployer.address);
-    
-    // Initialize Fhenix client
-    const fhenixClient = new FhenixClient({ provider: ethers.provider });
-    
-    // 1. Deploy Encrypted Alpha Hook
-    console.log("📦 Deploying Encrypted Alpha Hook...");
-    const EncryptedAlphaHook = await ethers.getContractFactory("EncryptedAlphaHook");
-    const encryptedAlphaHook = await EncryptedAlphaHook.deploy(
-        process.env.UNISWAP_V4_POOL_MANAGER
-    );
-    await encryptedAlphaHook.deployed();
-    console.log("✅ Encrypted Alpha Hook deployed to:", encryptedAlphaHook.address);
-    
-    // 2. Deploy Dark Pool Engine
-    console.log("📦 Deploying Dark Pool Engine...");
-    const DarkPoolEngine = await ethers.getContractFactory("DarkPoolEngine");
-    const darkPoolEngine = await DarkPoolEngine.deploy();
-    await darkPoolEngine.deployed();
-    console.log("✅ Dark Pool Engine deployed to:", darkPoolEngine.address);
-    
-    // 3. Deploy Strategy Weaver
-    console.log("📦 Deploying Strategy Weaver...");
-    const StrategyWeaver = await ethers.getContractFactory("StrategyWeaver");
-    const strategyWeaver = await StrategyWeaver.deploy();
-    await strategyWeaver.deployed();
-    console.log("✅ Strategy Weaver deployed to:", strategyWeaver.address);
-    
-    // 4. Deploy Risk Manager
-    console.log("📦 Deploying Risk Manager...");
-    const RiskManager = await ethers.getContractFactory("RiskManager");
-    const riskManager = await RiskManager.deploy();
-    await riskManager.deployed();
-    console.log("✅ Risk Manager deployed to:", riskManager.address);
-    
-    // 5. Configure contracts
-    console.log("⚙️ Configuring contracts...");
-    
-    // Set up inter-contract connections
-    await encryptedAlphaHook.setDarkPoolEngine(darkPoolEngine.address);
-    await encryptedAlphaHook.setRiskManager(riskManager.address);
-    await darkPoolEngine.setStrategyWeaver(strategyWeaver.address);
-    
-    // 6. Save deployment addresses
-    const deploymentInfo = {
-        network: "local",
-        deployTime: new Date().toISOString(),
-        deployer: deployer.address,
-        contracts: {
-            encryptedAlphaHook: encryptedAlphaHook.address,
-            darkPoolEngine: darkPoolEngine.address,
-            strategyWeaver: strategyWeaver.address,
-            riskManager: riskManager.address
-        }
-    };
-    
-    const fs = require('fs');
-    fs.writeFileSync(
-        'deployments/local.json', 
-        JSON.stringify(deploymentInfo, null, 2)
-    );
-    
-    console.log("🎉 Local deployment completed successfully!");
-    console.log("📄 Deployment info saved to deployments/local.json");
-}
-
-main()
-    .then(() => process.exit(0))
-    .catch((error) => {
-        console.error("❌ Deployment failed:", error);
-        process.exit(1);
-    });
-EOF
-
-# Run deployment
-npx hardhat run scripts/deploy-local.js --network local
-```
-
-### Step 3: Local Testing
-```bash
-# Run comprehensive test suite
-cat > test/integration/full-flow.test.js << 'EOF'
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
-const { FhenixClient } = require("@fhenixprotocol/fhenix.js");
-
-describe("Chimera Full Integration Flow", function() {
-    let deployer, user1, user2, hedgeFund;
-    let encryptedAlphaHook, darkPoolEngine, strategyWeaver;
-    let fhenixClient;
-    
-    before(async function() {
-        [deployer, user1, user2, hedgeFund] = await ethers.getSigners();
-        fhenixClient = new FhenixClient({ provider: ethers.provider });
-        
-        // Load deployed contracts
-        const deploymentInfo = require('../../deployments/local.json');
-        
-        encryptedAlphaHook = await ethers.getContractAt(
-            "EncryptedAlphaHook", 
-            deploymentInfo.contracts.encryptedAlphaHook
-        );
-        
-        darkPoolEngine = await ethers.getContractAt(
-            "DarkPoolEngine", 
-            deploymentInfo.contracts.darkPoolEngine
-        );
-        
-        strategyWeaver = await ethers.getContractAt(
-            "StrategyWeaver", 
-            deploymentInfo.contracts.strategyWeaver
-        );
-    });
-    
-    describe("🏦 Hedge Fund Strategy Deployment", function() {
-        it("Should deploy encrypted strategy successfully", async function() {
-            // Encrypt strategy parameters
-            const strikePrice = await fhenixClient.encrypt_uint64(3000);
-            const leverage = await fhenixClient.encrypt_uint64(5);
-            const volatility = await fhenixClient.encrypt_uint64(25);
-            
-            // Deploy strategy
-            const tx = await encryptedAlphaHook.connect(hedgeFund).deployStrategy(
-                strikePrice,
-                leverage,
-                volatility,
-                "0x" + "00".repeat(32) // mock formula hash
-            );
-            
-            const receipt = await tx.wait();
-            expect(receipt.status).to.equal(1);
-            
-            // Verify strategy exists
-            const strategyInfo = await encryptedAlphaHook.getStrategyInfo(0);
-            expect(strategyInfo.creator).to.equal(hedgeFund.address);
-            expect(strategyInfo.isActive).to.be.true;
-        });
-    });
-    
-    describe("🌑 Dark Pool Trading", function() {
-        it("Should execute confidential trade successfully", async function() {
-            // Encrypt trade parameters
-            const amountIn = await fhenixClient.encrypt_uint64(1000);
-            const minAmountOut = await fhenixClient.encrypt_uint64(900);
-            const maxSlippage = await fhenixClient.encrypt_uint64(50); // 0.5%
-            
-            // Submit confidential order
-            const tx = await darkPoolEngine.connect(user1).submitConfidentialOrder(
-                amountIn,
-                minAmountOut,
-                maxSlippage,
-                "0x" + "01".repeat(32), // buy order type
-                "0x" + "11".repeat(20), // token in
-                "0x" + "22".repeat(20), // token out
-                Math.floor(Date.now() / 1000) + 3600 // 1 hour deadline
-            );
-            
-            const receipt = await tx.wait();
-            expect(receipt.status).to.equal(1);
-            
-            // Verify order was submitted
-            const orderStatus = await darkPoolEngine.getOrderStatus(0);
-            expect(orderStatus.trader).to.equal(user1.address);
-            expect(orderStatus.isActive).to.be.true;
-        });
-        
-        it("Should execute batch with multiple orders", async function() {
-            // Submit multiple orders
-            for (let i = 0; i < 5; i++) {
-                const amountIn = await fhenixClient.encrypt_uint64(1000 + i * 100);
-                const minAmountOut = await fhenixClient.encrypt_uint64(900 + i * 90);
-                
-                await darkPoolEngine.connect(user2).submitConfidentialOrder(
-                    amountIn,
-                    minAmountOut,
-                    await fhenixClient.encrypt_uint64(50),
-                    "0x" + "01".repeat(32),
-                    "0x" + "11".repeat(20),
-                    "0x" + "22".repeat(20),
-                    Math.floor(Date.now() / 1000) + 3600
-                );
-            }
-            
-            // Execute batch
-            const tx = await darkPoolEngine.executeBatch();
-            const receipt = await tx.wait();
-            expect(receipt.status).to.equal(1);
-            
-            // Verify batch execution
-            const batchInfo = await darkPoolEngine.batches(0);
-            expect(batchInfo.isExecuted).to.be.true;
-            expect(batchInfo.totalOrders).to.be.greaterThan(0);
-        });
-    });
-    
-    describe("🧩 ZK-Portfolio Creation", function() {
-        it("Should create confidential portfolio successfully", async function() {
-            // Encrypt portfolio weights
-            const weight1 = await fhenixClient.encrypt_uint64(6000); // 60%
-            const weight2 = await fhenixClient.encrypt_uint64(4000); // 40%
-            
-            const tx = await strategyWeaver.connect(user1).createZKPortfolio(
-                [weight1, weight2],
-                ["0x" + "11".repeat(20), "0x" + "22".repeat(20)],
-                "0x" + "03".repeat(32), // rebalance strategy
-                await fhenixClient.encrypt_uint64(500), // 5% threshold
-                await fhenixClient.encrypt_uint64(86400), // daily rebalance
-                "0x" + "04".repeat(32) // conditions
-            );
-            
-            const receipt = await tx.wait();
-            expect(receipt.status).to.equal(1);
-            
-            // Verify portfolio creation
-            const portfolioInfo = await strategyWeaver.getPortfolioInfo(0);
-            expect(portfolioInfo.manager).to.equal(user1.address);
-            expect(portfolioInfo.isActive).to.be.true;
-            expect(portfolioInfo.assetAddresses.length).to.equal(2);
-        });
-    });
-    
-    describe("🛡️ Security & Emergency Functions", function() {
-        it("Should pause strategy in emergency", async function() {
-            await encryptedAlphaHook.connect(hedgeFund).pauseStrategy(0);
-            
-            const strategyInfo = await encryptedAlphaHook.getStrategyInfo(0);
-            expect(strategyInfo.isActive).to.be.false;
-        });
-        
-        it("Should handle invalid encrypted parameters gracefully", async function() {
-            await expect(
-                encryptedAlphaHook.connect(user1).deployStrategy(
-                    "0x", // invalid encrypted data
-                    "0x",
-                    "0x",
-                    "0x" + "00".repeat(32)
-                )
-            ).to.be.reverted;
-        });
-    });
-});
-EOF
-
-# Run tests
-npx hardhat test test/integration/full-flow.test.js --network local
-```
-
-## 🌐 Phase 2: Testnet Deployment
-
-### Step 1: Fhenix Helium Testnet Deployment
-```bash
-# Update hardhat config for testnet
-cat > hardhat.config.js << 'EOF'
-require("@nomicfoundation/hardhat-toolbox");
-require("dotenv").config();
-
-module.exports = {
-    solidity: {
-        version: "0.8.24",
-        settings: {
-            optimizer: {
-                enabled: true,
-                runs: 200
-            }
-        }
-    },
-    networks: {
-        local: {
-            url: "http://localhost:8545",
-            accounts: [process.env.FHENIX_PRIVATE_KEY]
-        },
-        fhenixHelium: {
-            url: "https://api.helium.fhenix.zone",
-            accounts: [process.env.FHENIX_PRIVATE_KEY],
-            chainId: 8008135
-        }
-    },
-    fhenix: {
-        client: {
-            provider: "https://api.helium.fhenix.zone"
-        }
-    }
-};
-EOF
-
-# Deploy to Fhenix Helium testnet
-npx hardhat run scripts/deploy-testnet.js --network fhenixHelium
-```
-
-### Step 2: Testnet Configuration
-```bash
-# Create testnet deployment script
-cat > scripts/deploy-testnet.js << 'EOF'
-const { ethers } = require("hardhat");
-const { FhenixClient } = require("@fhenixprotocol/fhenix.js");
-
-async function main() {
-    console.log("🌐 Starting Chimera testnet deployment...");
-    
-    const [deployer] = await ethers.getSigners();
-    console.log("Deployer balance:", await deployer.getBalance());
-    
-    // Check if we have enough gas
-    const gasPrice = await ethers.provider.getGasPrice();
-    console.log("Current gas price:", ethers.utils.formatUnits(gasPrice, "gwei"), "gwei");
-    
-    // Deploy with gas optimizations
-    const deployConfig = {
-        gasLimit: 5000000,
-        gasPrice: gasPrice
-    };
-    
-    try {
-        // Deploy contracts with proper gas settings
-        const EncryptedAlphaHook = await ethers.getContractFactory("EncryptedAlphaHook");
-        const encryptedAlphaHook = await EncryptedAlphaHook.deploy(
-            process.env.UNISWAP_V4_POOL_MANAGER,
-            deployConfig
-        );
-        
-        console.log("⏳ Waiting for deployment confirmation...");
-        await encryptedAlphaHook.deployed();
-        console.log("✅ Encrypted Alpha Hook deployed:", encryptedAlphaHook.address);
-        
-        // Wait for block confirmations
-        console.log("⏳ Waiting for block confirmations...");
-        await encryptedAlphaHook.deployTransaction.wait(3);
-        
-        // Continue with other contracts...
-        // [Similar deployment pattern for other contracts]
-        
-        // Verify contracts on explorer
-        if (process.env.FHENIX_API_KEY) {
-            console.log("🔍 Verifying contracts...");
-            await hre.run("verify:verify", {
-                address: encryptedAlphaHook.address,
-                constructorArguments: [process.env.UNISWAP_V4_POOL_MANAGER]
-            });
-        }
-        
-    } catch (error) {
-        console.error("❌ Deployment failed:", error);
-        process.exit(1);
-    }
-}
-
-main().catch(console.error);
-EOF
-
-# Execute testnet deployment
-npm run deploy:testnet
-```
-
-### Step 3: Testnet Verification
-```bash
-# Create verification script
-cat > scripts/verify-testnet.js << 'EOF'
-const { ethers } = require("hardhat");
-
-async function verifyDeployment() {
-    const deploymentInfo = require('../deployments/fhenixHelium.json');
-    
-    console.log("🔍 Verifying testnet deployment...");
-    
-    // Test each contract
-    const contracts = [
-        'encryptedAlphaHook',
-        'darkPoolEngine', 
-        'strategyWeaver',
-        'riskManager'
-    ];
-    
-    for (const contractName of contracts) {
-        const address = deploymentInfo.contracts[contractName];
-        
-        try {
-            const code = await ethers.provider.getCode(address);
-            if (code === '0x') {
-                throw new Error(`No code found at ${address}`);
-            }
-            
-            console.log(`✅ ${contractName}: ${address} - OK`);
-        } catch (error) {
-            console.log(`❌ ${contractName}: ${address} - FAILED`);
-            console.error(error.message);
-        }
-    }
-    
-    console.log("🎉 Testnet verification completed!");
-}
-
-verifyDeployment().catch(console.error);
-EOF
-
-# Run verification
-node scripts/verify-testnet.js
-```
-
-## 🏭 Phase 3: Production Deployment
-
-### Step 1: Pre-Production Security
-```bash
-# Security audit checklist script
-cat > scripts/security-check.js << 'EOF'
-const fs = require('fs');
-
-async function securityAudit() {
-    console.log("🛡️ Running pre-production security audit...");
-    
-    const checks = [
-        {
-            name: "Smart Contract Audit",
-            file: "audits/trail-of-bits-report.pdf",
-            required: true
-        },
-        {
-            name: "Fhenix Integration Review", 
-            file: "audits/fhenix-review.pdf",
-            required: true
-        },
-        {
-            name: "Economic Model Analysis",
-            file: "audits/economic-analysis.pdf", 
-            required: true
-        },
-        {
-            name: "Multisig Configuration",
-            env: "MULTISIG_ADDRESS",
-            required: true
-        },
-        {
-            name: "Timelock Setup",
-            env: "TIMELOCK_DELAY",
-            required: true
-        }
-    ];
-    
-    let allPassed = true;
-    
-    for (const check of checks) {
-        if (check.file) {
-            if (fs.existsSync(check.file)) {
-                console.log(`✅ ${check.name}: Found`);
-            } else {
-                console.log(`❌ ${check.name}: Missing`);
-                if (check.required) allPassed = false;
-            }
-        }
-        
-        if (check.env) {
-            if (process.env[check.env]) {
-                console.log(`✅ ${check.name}: Configured`);
-            } else {
-                console.log(`❌ ${check.name}: Not configured`);
-                if (check.required) allPassed = false;
-            }
-        }
-    }
-    
-    if (!allPassed) {
-        console.log("❌ Security audit failed. Please complete all requirements.");
-        process.exit(1);
-    }
-    
-    console.log("✅ Security audit passed. Ready for production deployment.");
-}
-
-securityAudit().catch(console.error);
-EOF
-
-# Run security check
-node scripts/security-check.js
-```
-
-### Step 2: Production Deployment with Governance
-```bash
-# Create production deployment with timelock
-cat > scripts/deploy-production.js << 'EOF'
-const { ethers } = require("hardhat");
-
-async function deployProduction() {
-    console.log("🏭 Starting production deployment with governance...");
-    
-    const [deployer] = await ethers.getSigners();
-    
-    // 1. Deploy Timelock Controller
-    const TimelockController = await ethers.getContractFactory("TimelockController");
-    const timelock = await TimelockController.deploy(
-        process.env.TIMELOCK_DELAY, // 48 hours
-        [process.env.MULTISIG_ADDRESS], // proposers
-        [process.env.MULTISIG_ADDRESS], // executors
-        deployer.address // admin (will be renounced)
-    );
-    await timelock.deployed();
-    console.log("✅ Timelock deployed:", timelock.address);
-    
-    // 2. Deploy Proxy Admin
-    const ProxyAdmin = await ethers.getContractFactory("ProxyAdmin");
-    const proxyAdmin = await ProxyAdmin.deploy();
-    await proxyAdmin.deployed();
-    console.log("✅ Proxy Admin deployed:", proxyAdmin.address);
-    
-    // 3. Deploy Implementation Contracts
-    const implementations = {};
-    
-    const contractNames = [
-        "EncryptedAlphaHook",
-        "DarkPoolEngine", 
-        "StrategyWeaver",
-        "RiskManager"
-    ];
-    
-    for (const name of contractNames) {
-        const Contract = await ethers.getContractFactory(name);
-        const impl = await Contract.deploy();
-        await impl.deployed();
-        implementations[name] = impl.address;
-        console.log(`✅ ${name} implementation:`, impl.address);
-    }
-    
-    // 4. Deploy Proxies
-    const TransparentUpgradeableProxy = await ethers.getContractFactory("TransparentUpgradeableProxy");
-    const proxies = {};
-    
-    for (const name of contractNames) {
-        const proxy = await TransparentUpgradeableProxy.deploy(
-            implementations[name],
-            proxyAdmin.address,
-            "0x" // empty init data
-        );
-        await proxy.deployed();
-        proxies[name] = proxy.address;
-        console.log(`✅ ${name} proxy:`, proxy.address);
-    }
-    
-    // 5. Transfer ownership to timelock
-    await proxyAdmin.transferOwnership(timelock.address);
-    console.log("✅ Ownership transferred to timelock");
-    
-    // 6. Save production deployment info
-    const deploymentInfo = {
-        network: "mainnet",
-        deployTime: new Date().toISOString(),
-        deployer: deployer.address,
-        governance: {
-            timelock: timelock.address,
-            proxyAdmin: proxyAdmin.address,
-            multisig: process.env.MULTISIG_ADDRESS
-        },
-        implementations,
-        proxies
-    };
-    
-    fs.writeFileSync(
-        'deployments/mainnet.json',
-        JSON.stringify(deploymentInfo, null, 2)
-    );
-    
-    console.log("🎉 Production deployment completed!");
-    console.log("⚠️  Remember to:");
-    console.log("   1. Renounce deployer admin role");
-    console.log("   2. Test all governance functions");
-    console.log("   3. Announce deployment to community");
-}
-
-deployProduction().catch(console.error);
-EOF
-
-# Deploy to production
-npm run deploy:production
-```
-
-### Step 3: Post-Deployment Monitoring
-```bash
-# Create monitoring dashboard
-cat > scripts/monitor.js << 'EOF'
-const { ethers } = require("hardhat");
-
-class ChimeraMonitor {
-    constructor() {
-        this.deploymentInfo = require('../deployments/mainnet.json');
-        this.contracts = {};
-        this.alerts = [];
-    }
-    
-    async initialize() {
-        console.log("📊 Initializing Chimera monitoring...");
-        
-        // Connect to contracts
-        for (const [name, address] of Object.entries(this.deploymentInfo.proxies)) {
-            this.contracts[name] = await ethers.getContractAt(name, address);
-        }
-        
-        // Set up event listeners
-        this.setupEventListeners();
-        
-        console.log("✅ Monitoring initialized");
-    }
-    
-    setupEventListeners() {
-        // Monitor strategy deployments
-        this.contracts.EncryptedAlphaHook.on("StrategyDeployed", (poolId, creator, event) => {
-            console.log(`🏦 New strategy deployed: Pool ${poolId} by ${creator}`);
-            this.checkStrategyLimits(poolId);
-        });
-        
-        // Monitor large trades
-        this.contracts.DarkPoolEngine.on("BatchExecuted", (batchId, orderCount, timestamp, event) => {
-            console.log(`🌑 Batch executed: ${orderCount} orders in batch ${batchId}`);
-            this.checkTradingVolume(batchId);
-        });
-        
-        // Monitor portfolio creation
-        this.contracts.StrategyWeaver.on("PortfolioCreated", (tokenId, manager, assetCount, event) => {
-            console.log(`🧩 Portfolio created: Token ${tokenId} with ${assetCount} assets`);
-        });
-    }
-    
-    async checkStrategyLimits(poolId) {
-        // Implement risk monitoring logic
-        const strategyInfo = await this.contracts.EncryptedAlphaHook.getStrategyInfo(poolId);
-        
-        if (strategyInfo.volume > ethers.utils.parseEther("10000")) {
-            this.alert(`High volume strategy detected: Pool ${poolId}`);
-        }
-    }
-    
-    async checkTradingVolume(batchId) {
-        // Monitor for unusual trading patterns
-        const batchInfo = await this.contracts.DarkPoolEngine.batches(batchId);
-        
-        if (batchInfo.totalOrders > 1000) {
-            this.alert(`Large batch executed: ${batchInfo.totalOrders} orders`);
-        }
-    }
-    
-    alert(message) {
-        const alert = {
-            timestamp: new Date().toISOString(),
-            message,
-            level: 'warning'
-        };
-        
-        this.alerts.push(alert);
-        console.log(`⚠️  ALERT: ${message}`);
-        
-        // Send to monitoring service (Discord, Slack, PagerDuty, etc.)
-        this.sendAlert(alert);
-    }
-    
-    async sendAlert(alert) {
-        // Implement alert delivery (webhook, email, etc.)
-        if (process.env.DISCORD_WEBHOOK) {
-            // Send Discord notification
-        }
-        
-        if (process.env.PAGERDUTY_KEY) {
-            // Send PagerDuty alert
-        }
-    }
-    
-    async generateDailyReport() {
-        console.log("📈 Generating daily report...");
-        
-        const report = {
-            date: new Date().toISOString().split('T')[0],
-            metrics: {
-                totalStrategies: await this.getTotalStrategies(),
-                totalTradingVolume: await this.getTotalTradingVolume(),
-                totalPortfolios: await this.getTotalPortfolios(),
-                alerts: this.alerts.length
-            }
-        };
-        
-        console.log("Daily Report:", report);
-        return report;
-    }
-    
-    async getTotalStrategies() {
-        // Implement strategy counting logic
-        return 0;
-    }
-    
-    async getTotalTradingVolume() {
-        // Implement volume calculation
-        return ethers.utils.parseEther("0");
-    }
-    
-    async getTotalPortfolios() {
-        // Implement portfolio counting
-        return 0;
-    }
-}
-
-// Start monitoring
-async function startMonitoring() {
-    const monitor = new ChimeraMonitor();
-    await monitor.initialize();
-    
-    // Generate daily reports
-    setInterval(async () => {
-        await monitor.generateDailyReport();
-    }, 24 * 60 * 60 * 1000); // 24 hours
-    
-    console.log("🚀 Chimera monitoring started!");
-}
-
-if (require.main === module) {
-    startMonitoring().catch(console.error);
-}
-
-module.exports = ChimeraMonitor;
-EOF
-
-# Start monitoring
-node scripts/monitor.js
-```
-
-## 🎯 Deployment Success Metrics
-
-### Technical Metrics
-- [ ] All contracts deployed successfully
-- [ ] Fhenix encryption working correctly
-- [ ] Gas costs within acceptable limits (<30% overhead)
-- [ ] No critical vulnerabilities found
-- [ ] All tests passing (>95% coverage)
-
-### Business Metrics
-- [ ] First strategy deployed within 24 hours
-- [ ] First dark pool trade executed
-- [ ] First ZK-portfolio created
-- [ ] Zero critical bugs in first week
-- [ ] Community engagement started
-
-### Security Metrics
-- [ ] Multi-signature wallet controlling upgrades
-- [ ] Timelock delay configured (48+ hours)
-- [ ] Emergency pause functionality tested
-- [ ] Monitoring alerts configured
-- [ ] Incident response plan activated
-
-## 🚨 Emergency Procedures
-
-### Circuit Breaker Activation
-```solidity
-// Emergency pause all operations
-await emergencyPause.pauseAll();
-
-// Pause specific components
-await encryptedAlphaHook.pause();
-await darkPoolEngine.pause();
-await strategyWeaver.pause();
-```
-
-### Incident Response Plan
-1. **Detection**: Monitoring alerts trigger
-2. **Assessment**: Evaluate severity and impact
-3. **Response**: Execute appropriate emergency procedures
-4. **Communication**: Notify users and community
-5. **Resolution**: Deploy fixes via governance
-6. **Post-mortem**: Document and improve
-
-## 📊 Post-Deployment Checklist
-
-### Day 1
-- [ ] All systems operational
-- [ ] Monitoring dashboards active
-- [ ] First transactions processed
-- [ ] Community announcement made
-
-### Week 1
-- [ ] No critical issues detected
-- [ ] User feedback collected
-- [ ] Performance metrics within targets
-- [ ] First audit report published
-
-### Month 1
-- [ ] TVL growth on track
-- [ ] User adoption metrics positive
-- [ ] No security incidents
-- [ ] Governance proposals active
 
 ---
 
-**🎉 Congratulations! Chimera is now live and revolutionizing DeFi!** 🚀
+## 2. Local Development Deployment
+
+### 2.1 Local Network Setup
+
+#### 2.1.1 Start Local Blockchain
+
+```bash
+# Option 1: Hardhat Network
+npx hardhat node
+
+# Option 2: Anvil (Foundry)
+anvil --host 0.0.0.0 --port 8545
+```
+
+#### 2.1.2 Configure Local Environment
+
+```bash
+# Create local environment file
+cp .env.example .env.local
+
+# Edit local configuration
+cat > .env.local << EOF
+# Local network configuration
+NETWORK=local
+RPC_URL=http://localhost:8545
+CHAIN_ID=31337
+PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+
+# Local contract addresses (will be filled after deployment)
+CUSTOM_CURVE_HOOK=
+DARK_POOL_ENGINE=
+STRATEGY_WEAVER=
+EOF
+```
+
+### 2.2 Local Deployment Process
+
+#### 2.2.1 Deploy Infrastructure Contracts
+
+```bash
+# Deploy mock contracts for testing
+npm run deploy:mocks
+
+# Expected output:
+# ✅ Mock Pool Manager deployed to: 0x...
+# ✅ Mock ERC20 Token A deployed to: 0x...
+# ✅ Mock ERC20 Token B deployed to: 0x...
+```
+
+#### 2.2.2 Deploy Core Contracts
+
+```bash
+# Deploy all core contracts
+npm run deploy:local
+
+# Or deploy individually
+npm run deploy:custom-curve-hook
+npm run deploy:dark-pool-engine
+npm run deploy:strategy-weaver
+```
+
+**Expected Deployment Output:**
+```bash
+🚀 Starting Chimera local deployment...
+Deploying with account: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+Account balance: 9999.999567108847962536
+
+📦 Deploying Mock Pool Manager...
+✅ Mock Pool Manager deployed to: 0x5FbDB2315678afecb367f032d93F642f64180aa3
+
+📦 Deploying Custom Curve Hook...
+✅ Custom Curve Hook deployed to: 0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512
+
+📦 Deploying Dark Pool Engine...
+✅ Dark Pool Engine deployed to: 0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0
+
+🪙 Minting test tokens...
+✅ Minted 1M tokens each to deployer
+
+🎉 Local deployment completed successfully!
+📄 Deployment info saved to deployments/local.json
+```
+
+#### 2.2.3 Verify Local Deployment
+
+```bash
+# Test basic functionality
+npm run test:local-deployment
+
+# Check contract interactions
+npm run verify:local
+```
+
+### 2.3 Local Testing & Development
+
+#### 2.3.1 Run Test Suite
+
+```bash
+# Run all tests
+npm test
+
+# Run specific test categories
+npm run test:unit
+npm run test:integration
+
+# Run tests with coverage
+npm run test:coverage
+```
+
+#### 2.3.2 Development Workflow
+
+```bash
+# Start development environment
+npm run dev:start
+
+# In another terminal, watch for changes
+npm run dev:watch
+
+# Deploy contract changes
+npm run dev:deploy
+
+# Reset local environment
+npm run dev:reset
+```
+
+---
+
+## 3. Testnet Deployment
+
+### 3.1 Fhenix Helium Testnet
+
+#### 3.1.1 Network Configuration
+
+```bash
+# Configure Fhenix network
+fhenix config --network helium --rpc-url https://api.helium.fhenix.zone
+
+# Add network to Hardhat config
+cat >> hardhat.config.js << EOF
+fhenixHelium: {
+  url: "https://api.helium.fhenix.zone",
+  accounts: [process.env.FHENIX_PRIVATE_KEY],
+  chainId: 8008135,
+  gasPrice: 1000000000,
+  timeout: 60000
+}
+EOF
+```
+
+#### 3.1.2 Get Testnet Tokens
+
+```bash
+# Request testnet FHE tokens from faucet
+curl -X POST https://faucet.helium.fhenix.zone/api/faucet \
+  -H "Content-Type: application/json" \
+  -d '{"address": "YOUR_ADDRESS"}'
+
+# Verify balance
+fhenix balance --network helium --address YOUR_ADDRESS
+```
+
+### 3.2 Testnet Deployment Process
+
+#### 3.2.1 Pre-deployment Checks
+
+```bash
+# Verify environment
+npm run check:testnet
+
+# Validate configuration
+npm run validate:config
+
+# Run security checks
+npm run security:check
+```
+
+#### 3.2.2 Deploy to Testnet
+
+```bash
+# Deploy all contracts to testnet
+npm run deploy:testnet
+
+# Or use step-by-step deployment
+npm run deploy:testnet:step-by-step
+```
+
+**Testnet Deployment Script:**
+```bash
+#!/bin/bash
+set -e
+
+echo "🚀 Starting Fhenix Helium testnet deployment..."
+
+# Check prerequisites
+echo "📋 Checking prerequisites..."
+node scripts/check-prerequisites.js
+
+# Deploy contracts
+echo "📦 Deploying contracts..."
+npx hardhat run scripts/deploy-testnet.js --network fhenixHelium
+
+# Verify contracts
+echo "🔍 Verifying contracts..."
+npm run verify:testnet
+
+# Test deployment
+echo "🧪 Testing deployment..."
+npm run test:testnet
+
+echo "✅ Testnet deployment completed!"
+```
+
+#### 3.2.3 Contract Verification
+
+```bash
+# Verify on block explorer
+npm run verify:fhenix-helium
+
+# Manual verification if needed
+npx hardhat verify --network fhenixHelium CONTRACT_ADDRESS CONSTRUCTOR_ARGS
+
+# Verify all contracts
+npm run verify:all:testnet
+```
+
+### 3.3 Testnet Testing
+
+#### 3.3.1 Integration Testing
+
+```bash
+# Run testnet integration tests
+npm run test:testnet:integration
+
+# Test with real Fhenix encryption
+npm run test:fhe:testnet
+
+# Performance testing
+npm run test:performance:testnet
+```
+
+#### 3.3.2 User Acceptance Testing
+
+```bash
+# Deploy frontend to testnet
+npm run deploy:frontend:testnet
+
+# Run end-to-end tests
+npm run test:e2e:testnet
+
+# Monitor testnet deployment
+npm run monitor:testnet
+```
+
+---
+
+## 4. Mainnet Deployment
+
+### 4.1 Pre-deployment Preparation
+
+#### 4.1.1 Security Audit Completion
+
+```bash
+# Verify all audits are completed
+echo "📋 Security Audit Checklist:"
+echo "✅ Smart contract audit by Trail of Bits"
+echo "✅ Smart contract audit by ConsenSys"
+echo "✅ Fhenix FHE implementation review"
+echo "✅ Economic model analysis"
+echo "✅ Frontend security review"
+
+# Generate final audit report
+npm run audit:generate-report
+```
+
+#### 4.1.2 Final Testing
+
+```bash
+# Run complete test suite
+npm run test:complete
+
+# Security testing
+npm run test:security:complete
+
+# Gas optimization verification
+npm run analyze:gas:final
+
+# Performance benchmarking
+npm run benchmark:final
+```
+
+#### 4.1.3 Governance Preparation
+
+```bash
+# Prepare governance proposal
+npm run governance:prepare-proposal
+
+# Generate deployment parameters
+npm run governance:generate-params
+
+# Create multisig setup
+npm run multisig:setup
+```
+
+### 4.2 Mainnet Deployment Strategy
+
+#### 4.2.1 Phased Deployment Plan
+
+```mermaid
+graph TD
+    A[Phase 1: Infrastructure] --> B[Phase 2: Core Contracts]
+    B --> C[Phase 3: Integration]
+    C --> D[Phase 4: Public Launch]
+    
+    A --> A1[Deploy Governance]
+    A --> A2[Setup Multisig]
+    A --> A3[Configure Timelock]
+    
+    B --> B1[Deploy Hooks]
+    B --> B2[Deploy Dark Pool]
+    B --> B3[Deploy Weaver]
+    
+    C --> C1[Integration Testing]
+    C --> C2[Limited Beta]
+    C --> C3[Security Verification]
+    
+    D --> D1[Public Announcement]
+    D --> D2[Frontend Launch]
+    D --> D3[Full Functionality]
+```
+
+#### 4.2.2 Phase 1: Infrastructure Deployment
+
+```bash
+# Deploy governance contracts
+npm run deploy:governance:mainnet
+
+# Setup multisig wallet
+npm run setup:multisig:mainnet
+
+# Configure timelock controller
+npm run setup:timelock:mainnet
+
+# Verify infrastructure
+npm run verify:infrastructure:mainnet
+```
+
+**Infrastructure Deployment Script:**
+```javascript
+// scripts/deploy-infrastructure-mainnet.js
+async function deployInfrastructure() {
+    console.log("🏛️ Deploying governance infrastructure...");
+    
+    // Deploy governance token
+    const chimeraToken = await deployContract("ChimeraToken", [
+        ethers.utils.parseEther("100000000"), // 100M total supply
+        deployer.address
+    ]);
+    
+    // Deploy timelock controller
+    const timelock = await deployContract("TimelockController", [
+        172800, // 48 hour delay
+        [multisigAddress], // proposers
+        [multisigAddress]  // executors
+    ]);
+    
+    // Deploy governor
+    const governor = await deployContract("ChimeraGovernor", [
+        chimeraToken.address,
+        timelock.address
+    ]);
+    
+    console.log("✅ Infrastructure deployed successfully");
+    return { chimeraToken, timelock, governor };
+}
+```
+
+#### 4.2.3 Phase 2: Core Contracts Deployment
+
+```bash
+# Deploy with governance approval
+npm run deploy:core:with-governance
+
+# Verify deployment through governance
+npm run verify:core:governance
+```
+
+**Core Deployment Script:**
+```javascript
+// scripts/deploy-core-mainnet.js
+async function deployCoreContracts() {
+    console.log("🔧 Deploying core contracts...");
+    
+    // Deploy through governance proposal
+    const proposal = await createGovernanceProposal({
+        title: "Deploy Chimera Core Contracts",
+        description: "Deploy CustomCurveHook, DarkPoolEngine, and StrategyWeaver",
+        actions: [
+            {
+                target: deployerAddress,
+                value: 0,
+                signature: "deployCustomCurveHook(address)",
+                calldata: encodeParameters(["address"], [poolManagerAddress])
+            },
+            {
+                target: deployerAddress,
+                value: 0,
+                signature: "deployDarkPoolEngine()",
+                calldata: "0x"
+            }
+            // Additional deployment actions...
+        ]
+    });
+    
+    console.log(`📋 Governance proposal created: ${proposal.id}`);
+    return proposal;
+}
+```
+
+#### 4.2.4 Phase 3: Integration & Beta Testing
+
+```bash
+# Deploy beta version with limited access
+npm run deploy:beta:mainnet
+
+# Enable limited user access
+npm run enable:beta-access
+
+# Monitor beta performance
+npm run monitor:beta:mainnet
+```
+
+#### 4.2.5 Phase 4: Public Launch
+
+```bash
+# Enable full public access
+npm run enable:public-access:mainnet
+
+# Deploy frontend to production
+npm run deploy:frontend:mainnet
+
+# Start monitoring systems
+npm run start:monitoring:mainnet
+
+# Announce launch
+npm run announce:launch
+```
+
+### 4.3 Mainnet Configuration
+
+#### 4.3.1 Production Parameters
+
+```javascript
+// config/mainnet.config.js
+module.exports = {
+    // Network settings
+    network: {
+        chainId: 1,
+        rpc: process.env.ETHEREUM_RPC_URL,
+        confirmations: 2
+    },
+    
+    // Contract settings
+    contracts: {
+        customCurveHook: {
+            maxLeverage: 50,
+            maxVolatilityFactor: 1000,
+            minLiquidity: ethers.utils.parseEther("10000")
+        },
+        darkPoolEngine: {
+            batchInterval: 300,     // 5 minutes
+            maxBatchSize: 100,
+            minOrderValue: ethers.utils.parseEther("1")
+        },
+        strategyWeaver: {
+            maxAssets: 50,
+            minWeight: 100,        // 1%
+            rebalanceThreshold: 500 // 5%
+        }
+    },
+    
+    // Security settings
+    security: {
+        timelockDelay: 172800,    // 48 hours
+        multisigThreshold: 3,     // 3 of 5
+        emergencyPauseDelay: 0    // Immediate
+    },
+    
+    // Fee settings
+    fees: {
+        protocolFee: 50,          // 0.5%
+        strategistFee: 200,       // 2%
+        maxTotalFee: 300          // 3%
+    }
+};
+```
+
+#### 4.3.2 Monitoring Setup
+
+```bash
+# Deploy monitoring infrastructure
+npm run deploy:monitoring:mainnet
+
+# Configure alerts
+npm run setup:alerts:mainnet
+
+# Start real-time monitoring
+npm run start:monitoring:realtime
+```
+
+---
+
+## 5. Verification & Monitoring
+
+### 5.1 Contract Verification
+
+#### 5.1.1 Automated Verification
+
+```bash
+# Verify all contracts automatically
+npm run verify:all
+
+# Verify specific contract
+npx hardhat verify --network mainnet CONTRACT_ADDRESS CONSTRUCTOR_ARGS
+
+# Verify with libraries
+npx hardhat verify --network mainnet CONTRACT_ADDRESS \
+  --libraries libraries.json CONSTRUCTOR_ARGS
+```
+
+#### 5.1.2 Manual Verification Process
+
+```bash
+# Flatten contracts for manual verification
+npx hardhat flatten contracts/hooks/CustomCurveHook.sol > flattened/CustomCurveHook.sol
+
+# Remove duplicate SPDX identifiers
+npm run clean:flattened
+
+# Submit to Etherscan manually
+echo "Submit flattened contracts to Etherscan block explorer"
+```
+
+### 5.2 Deployment Verification
+
+#### 5.2.1 Functional Testing
+
+```bash
+# Test all core functions
+npm run test:deployment:functions
+
+# Test integration points
+npm run test:deployment:integration
+
+# Test security measures
+npm run test:deployment:security
+```
+
+**Verification Script:**
+```javascript
+// scripts/verify-deployment.js
+async function verifyDeployment() {
+    console.log("🔍 Verifying deployment...");
+    
+    // Check contract addresses
+    const contracts = await loadDeploymentAddresses();
+    for (const [name, address] of Object.entries(contracts)) {
+        const code = await provider.getCode(address);
+        console.log(`✅ ${name}: ${address} (${code.length} bytes)`);
+    }
+    
+    // Test basic functionality
+    const hook = await ethers.getContractAt("CustomCurveHook", contracts.customCurveHook);
+    const permissions = await hook.getHookPermissions();
+    console.log(`✅ Hook permissions configured correctly`);
+    
+    // Test governance
+    const governor = await ethers.getContractAt("ChimeraGovernor", contracts.governor);
+    const votingDelay = await governor.votingDelay();
+    console.log(`✅ Governor voting delay: ${votingDelay} blocks`);
+    
+    console.log("✅ Deployment verification completed");
+}
+```
+
+#### 5.2.2 Performance Validation
+
+```bash
+# Gas usage analysis
+npm run analyze:gas:deployment
+
+# Transaction throughput testing
+npm run test:throughput:deployment
+
+# Load testing
+npm run test:load:deployment
+```
+
+### 5.3 Monitoring Setup
+
+#### 5.3.1 Real-time Monitoring
+
+```bash
+# Start monitoring services
+docker-compose -f monitoring/docker-compose.yml up -d
+
+# Configure Grafana dashboards
+npm run setup:grafana:dashboards
+
+# Setup Prometheus metrics
+npm run setup:prometheus:metrics
+```
+
+#### 5.3.2 Alert Configuration
+
+```yaml
+# monitoring/alerts.yml
+groups:
+  - name: chimera-protocol
+    rules:
+      - alert: HighGasUsage
+        expr: avg_gas_price > 100
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High gas usage detected"
+          
+      - alert: ContractPaused
+        expr: contract_paused == 1
+        for: 0s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Contract has been paused"
+          
+      - alert: UnusualTradingVolume
+        expr: trading_volume_1h > 1000000
+        for: 10m
+        labels:
+          severity: info
+        annotations:
+          summary: "Unusual trading volume detected"
+```
+
+#### 5.3.3 Health Checks
+
+```bash
+# Automated health checks
+npm run health:check:all
+
+# Contract status monitoring
+npm run monitor:contract:status
+
+# Network connectivity checks
+npm run check:network:connectivity
+```
+
+---
+
+## 6. Troubleshooting
+
+### 6.1 Common Deployment Issues
+
+#### 6.1.1 Gas Estimation Failures
+
+**Issue**: Gas estimation too high or failing
+```
+Error: Transaction would exceed block gas limit
+```
+
+**Solutions:**
+```bash
+# Check contract size
+npm run analyze:contract-size
+
+# Optimize contracts
+npm run optimize:contracts
+
+# Use manual gas limit
+npx hardhat run scripts/deploy.js --network mainnet --gas-limit 8000000
+```
+
+#### 6.1.2 Network Connection Issues
+
+**Issue**: RPC connection timeouts
+```
+Error: timeout of 60000ms exceeded
+```
+
+**Solutions:**
+```javascript
+// hardhat.config.js - Increase timeouts
+networks: {
+  mainnet: {
+    url: process.env.ETHEREUM_RPC_URL,
+    timeout: 120000,
+    httpHeaders: {
+      "User-Agent": "ChimeraProtocol/1.0"
+    }
+  }
+}
+
+// Use multiple RPC endpoints
+const rpcUrls = [
+  process.env.ETHEREUM_RPC_URL,
+  process.env.BACKUP_RPC_URL,
+  process.env.THIRD_RPC_URL
+];
+```
+
+#### 6.1.3 Verification Failures
+
+**Issue**: Contract verification failing on Etherscan
+```
+Error: Contract source code already verified
+```
+
+**Solutions:**
+```bash
+# Check if already verified
+curl "https://api.etherscan.io/api?module=contract&action=getsourcecode&address=${CONTRACT_ADDRESS}&apikey=${API_KEY}"
+
+# Force re-verification
+npx hardhat verify --force --network mainnet CONTRACT_ADDRESS ARGS
+
+# Use flattened source
+npx hardhat flatten contracts/Contract.sol > Contract_flat.sol
+# Submit manually to Etherscan
+```
+
+### 6.2 Fhenix-Specific Issues
+
+#### 6.2.1 FHE Operation Failures
+
+**Issue**: Encrypted operations not working
+```
+Error: FHE operation failed
+```
+
+**Solutions:**
+```bash
+# Check Fhenix client setup
+fhenix status --network helium
+
+# Verify encryption parameters
+npm run test:fhe:parameters
+
+# Update Fhenix SDK
+npm update @fhenixprotocol/fhenix.js
+```
+
+#### 6.2.2 Network Configuration
+
+**Issue**: Wrong Fhenix network configuration
+```
+Error: Unsupported network
+```
+
+**Solutions:**
+```javascript
+// Correct Fhenix Helium configuration
+{
+  url: "https://api.helium.fhenix.zone",
+  chainId: 8008135,
+  accounts: [process.env.FHENIX_PRIVATE_KEY],
+  gasPrice: 1000000000
+}
+```
+
+### 6.3 Emergency Procedures
+
+#### 6.3.1 Contract Pause
+
+```bash
+# Emergency pause all contracts
+npm run emergency:pause:all
+
+# Pause specific contract
+npm run emergency:pause:contract CONTRACT_NAME
+
+# Unpause after issue resolution
+npm run emergency:unpause:all
+```
+
+#### 6.3.2 Upgrade Procedures
+
+```bash
+# Prepare upgrade proposal
+npm run upgrade:prepare CONTRACT_NAME NEW_IMPLEMENTATION
+
+# Submit governance proposal
+npm run governance:submit:upgrade
+
+# Execute upgrade after voting
+npm run upgrade:execute PROPOSAL_ID
+```
+
+#### 6.3.3 Incident Response
+
+```bash
+# Activate incident response
+npm run incident:activate
+
+# Gather system state
+npm run incident:gather-state
+
+# Prepare incident report
+npm run incident:prepare-report
+
+# Post-incident analysis
+npm run incident:analyze
+```
+
+---
+
+## 7. Deployment Checklists
+
+### 7.1 Pre-deployment Checklist
+
+#### 7.1.1 Code Readiness
+- [ ] All tests passing (100% success rate)
+- [ ] Security audits completed and issues resolved
+- [ ] Code review completed by senior developers
+- [ ] Gas optimization analysis completed
+- [ ] Contract size within limits
+- [ ] Documentation updated and complete
+
+#### 7.1.2 Infrastructure Readiness
+- [ ] RPC endpoints configured and tested
+- [ ] Private keys secured (hardware wallet/HSM)
+- [ ] Multisig wallets set up and tested
+- [ ] Monitoring systems configured
+- [ ] Alert systems tested
+- [ ] Backup procedures in place
+
+#### 7.1.3 Network Readiness
+- [ ] Sufficient ETH/FHE for deployment gas costs
+- [ ] Network congestion assessed
+- [ ] Gas price strategy determined
+- [ ] Deployment timing coordinated
+- [ ] Emergency contacts notified
+- [ ] Communication plan ready
+
+### 7.2 Post-deployment Checklist
+
+#### 7.2.1 Immediate Verification (0-1 hour)
+- [ ] All contracts deployed successfully
+- [ ] Contract addresses recorded
+- [ ] Basic functionality tested
+- [ ] Permissions configured correctly
+- [ ] Initial parameters set
+- [ ] Monitoring systems activated
+
+#### 7.2.2 Short-term Verification (1-24 hours)
+- [ ] Contract verification on block explorers
+- [ ] Integration testing completed
+- [ ] Performance metrics baseline established
+- [ ] User access tested
+- [ ] Documentation updated with addresses
+- [ ] Community announcement made
+
+#### 7.2.3 Long-term Monitoring (1-7 days)
+- [ ] System stability confirmed
+- [ ] Performance within expected ranges
+- [ ] No critical issues detected
+- [ ] User feedback collected
+- [ ] Governance transition (if applicable)
+- [ ] Post-deployment report created
+
+---
+
+## 8. Deployment Commands Reference
+
+### 8.1 Local Development
+
+```bash
+# Environment setup
+npm run setup:local
+npm run start:local
+npm run deploy:local
+npm run test:local
+
+# Development workflow
+npm run dev:start
+npm run dev:deploy
+npm run dev:test
+npm run dev:reset
+```
+
+### 8.2 Testnet Deployment
+
+```bash
+# Fhenix Helium testnet
+npm run deploy:fhenix-helium
+npm run verify:fhenix-helium
+npm run test:fhenix-helium
+
+# Other testnets
+npm run deploy:goerli
+npm run deploy:sepolia
+```
+
+### 8.3 Mainnet Deployment
+
+```bash
+# Infrastructure
+npm run deploy:governance:mainnet
+npm run deploy:multisig:mainnet
+npm run deploy:timelock:mainnet
+
+# Core contracts
+npm run deploy:core:mainnet
+npm run verify:core:mainnet
+npm run test:core:mainnet
+
+# Complete deployment
+npm run deploy:mainnet:complete
+```
+
+### 8.4 Monitoring & Maintenance
+
+```bash
+# Start monitoring
+npm run monitor:start
+npm run alerts:enable
+npm run health:check
+
+# Maintenance
+npm run upgrade:check
+npm run security:scan
+npm run performance:analyze
+```
+
+---
+
+## 9. Conclusion
+
+This deployment guide provides comprehensive procedures for deploying Chimera Protocol across all environments. Key success factors include:
+
+- **Thorough Testing**: Complete test coverage before any deployment
+- **Security First**: Security considerations at every step
+- **Phased Approach**: Gradual rollout minimizes risks
+- **Monitoring**: Real-time monitoring and alerting
+- **Documentation**: Complete documentation for operations team
+
+**Next Steps:**
+1. Review and customize deployment parameters for your environment
+2. Set up monitoring and alerting systems
+3. Conduct thorough testing in lower environments
+4. Execute phased deployment to production
+5. Monitor performance and iterate
+
+For additional support:
+- **Documentation**: [docs.chimera.finance](https://docs.chimera.finance)
+- **GitHub**: [github.com/ChimeraProtocol](https://github.com/ChimeraProtocol)
+- **Discord**: [discord.gg/chimera](https://discord.gg/chimera)
+- **Support**: deployments@chimera.finance
+
+---
+
+**🚀 Ready for deployment? Follow this guide step by step and launch the future of confidential DeFi!**

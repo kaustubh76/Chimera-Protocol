@@ -1,8 +1,10 @@
-# Chimera Protocol: Technical Whitepaper
+# Chimera Protocol: Confidential Financial Engineering on Public Blockchains
 
 ## Abstract
 
-Chimera Protocol introduces the first confidential automated market maker (AMM) that enables institutional-grade financial strategy deployment while preserving intellectual property through fully homomorphic encryption (FHE). By integrating Fhenix's confidential computing with Uniswap V4's programmable hooks, Chimera creates a dual-market ecosystem supporting both transparent and confidential trading, addressing the $4.5 trillion institutional finance market currently excluded from DeFi due to transparency requirements.
+Chimera Protocol introduces the first confidential automated market maker (AMM) that enables institutional-grade financial strategy deployment while preserving intellectual property through fully homomorphic encryption (FHE). By combining Uniswap V4's programmable hooks with Fhenix's confidential computing capabilities, Chimera transforms traditional transparent AMMs into sophisticated financial engineering platforms that protect trade secrets and eliminate MEV exploitation.
+
+**Keywords:** Confidential Computing, AMM, Financial Engineering, MEV Protection, Homomorphic Encryption, DeFi
 
 ---
 
@@ -10,355 +12,333 @@ Chimera Protocol introduces the first confidential automated market maker (AMM) 
 
 ### 1.1 Problem Statement
 
-The current DeFi ecosystem suffers from two fundamental limitations that prevent institutional adoption:
+Traditional decentralized finance (DeFi) protocols operate with complete transparency, creating fundamental barriers to institutional adoption:
 
-1. **Transparency Paradox**: While transparency is a core DeFi principle, it creates an insurmountable barrier for institutional players whose competitive advantage relies on proprietary trading strategies. A hedge fund deploying a $50M proprietary volatility arbitrage strategy on-chain would see it instantly copied, destroying their intellectual property.
+1. **Intellectual Property Exposure**: Sophisticated trading strategies become immediately visible and copyable
+2. **MEV Exploitation**: Public mempools enable front-running and sandwich attacks
+3. **Limited Financial Products**: Lack of complex derivatives and structured products
+4. **Oracle Dependencies**: External price feeds create centralization risks and attack vectors
 
-2. **MEV Exploitation**: The public nature of transaction mempools enables Maximum Extractable Value (MEV) extraction, with over $1.4B extracted annually from users through front-running, sandwich attacks, and other predatory practices.
+### 1.2 Solution Overview
 
-### 1.2 Market Opportunity
+Chimera Protocol addresses these challenges through three core innovations:
 
-- **Total Addressable Market**: $4.5 trillion in hedge fund assets under management
-- **Immediate Opportunity**: $100B+ current DeFi total value locked
-- **Annual MEV Problem**: $1.4B extracted from traders annually
-- **Institutional Demand**: Growing interest in DeFi with privacy concerns
-
-### 1.3 Solution Overview
-
-Chimera Protocol solves these challenges through three core innovations:
-
-1. **Encrypted Alpha Hooks**: Strategy parameters encrypted using Fhenix fhEVM, enabling confidential strategy deployment
-2. **Dark Pool Trading Engine**: MEV-resistant order execution through confidential batch processing
-3. **ZK-Portfolio Weaver**: Zero-knowledge portfolio composition with encrypted asset weights
+- **Encrypted Alpha Hook**: Confidential strategy parameters using Fhenix FHE
+- **Dark Pool Engine**: MEV-resistant trading through encrypted order batching
+- **ZK-Portfolio Weaver**: Confidential portfolio composition with encrypted weights
 
 ---
 
-## 2. Technical Architecture
+## 2. Technical Foundation
 
-### 2.1 System Overview
+### 2.1 Fully Homomorphic Encryption (FHE)
+
+Chimera leverages Fhenix's fhEVM implementation of FHE to perform computations on encrypted data without revealing the underlying values.
+
+#### 2.1.1 Mathematical Framework
+
+Let `E(x)` represent the encryption of value `x` using FHE. The fundamental property we exploit is:
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    Chimera Protocol                         │
-├─────────────────┬─────────────────────┬─────────────────────┤
-│ Uniswap V4      │ Fhenix Confidential │ Custom Financial    │
-│ Hook Layer      │ Computing Layer     │ Engineering Layer   │
-└─────────────────┴─────────────────────┴─────────────────────┘
+E(x) ⊕ E(y) = E(x ⊕ y)
 ```
 
-### 2.2 Fhenix fhEVM Integration
+Where `⊕` represents any homomorphic operation (addition, multiplication, etc.).
 
-Chimera leverages Fhenix's fully homomorphic encryption virtual machine (fhEVM) to enable computation on encrypted data without ever decrypting it.
+#### 2.1.2 Encrypted Data Types
 
-#### 2.2.1 Encrypted Parameter Storage
-```solidity
-struct EncryptedStrategy {
-    FheUint64 strikePrice;      // Encrypted strike price
-    FheUint64 leverageFactor;   // Encrypted leverage multiplier
-    FheUint64 volatilityParam;  // Encrypted volatility coefficient
-    FheBytes32 formulaHash;     // Encrypted formula identifier
-    FheUint64 expiryTimestamp;  // Encrypted expiry time
-}
-```
+Chimera utilizes the following encrypted primitives:
 
-#### 2.2.2 Confidential Computation
-All price calculations are performed on encrypted values:
-```solidity
-function calculateConfidentialPrice(
-    FheUint64 encryptedStrike,
-    FheUint64 encryptedLeverage,
-    uint256 publicReserves
-) internal pure returns (FheUint64) {
-    FheUint64 basePrice = FHE.asEuint64(publicReserves);
-    FheUint64 leveragedPrice = FHE.mul(basePrice, encryptedLeverage);
-    return FHE.add(leveragedPrice, encryptedStrike);
-}
-```
+- **FheUint64**: 64-bit encrypted integers for price calculations
+- **FheBytes32**: Encrypted byte arrays for formula hashes and metadata
+- **FheBool**: Encrypted boolean values for conditional logic
 
-### 2.3 Uniswap V4 Hook Architecture
+### 2.2 Uniswap V4 Hook Architecture
 
-#### 2.3.1 Custom Curve Hook
-The CustomCurveHook replaces the standard x*y=k formula with arbitrary mathematical functions:
+#### 2.2.1 Hook Lifecycle
 
-```solidity
-contract CustomCurveHook is BaseHook, ICustomCurve {
-    enum CurveType { Linear, Exponential, Sigmoid, Logarithmic, Polynomial, Custom }
-    
-    function calculatePrice(
-        PoolId poolId,
-        uint256 reserves0,
-        uint256 reserves1,
-        bool zeroForOne
-    ) public view returns (FheUint64) {
-        CurveParams storage params = poolCurves[poolId];
-        return params.computePrice(reserves0, reserves1, zeroForOne);
-    }
-}
-```
+Chimera hooks integrate with Uniswap V4's lifecycle events:
 
-#### 2.3.2 Hook Permissions
 ```solidity
 function getHookPermissions() public pure returns (Hooks.Permissions memory) {
     return Hooks.Permissions({
-        beforeInitialize: true,    // Set curve parameters
+        beforeInitialize: true,    // Setup encrypted parameters
+        afterInitialize: true,     // Validate configuration
         beforeSwap: true,          // Custom price calculation
         afterSwap: true,           // Update internal state
-        // Other permissions as needed
+        // Other hooks as needed
     });
+}
+```
+
+#### 2.2.2 Pool Configuration
+
+Each Chimera pool is configured with:
+
+```solidity
+struct ChimeraPoolConfig {
+    CurveType curveType;
+    FheUint64[] encryptedCoefficients;
+    FheBytes32 formulaHash;
+    uint256 maxLeverage;
+    uint256 volatilityFactor;
 }
 ```
 
 ---
 
-## 3. Core Components
+## 3. Core Protocols
 
-### 3.1 Encrypted Alpha Hook
+### 3.1 Custom Curve Engine
 
-The Encrypted Alpha Hook enables confidential strategy deployment with the following capabilities:
+#### 3.1.1 Mathematical Curve Types
 
-#### 3.1.1 Strategy Parameter Encryption
-Strategy creators can deploy sophisticated financial products without revealing their parameters:
+Chimera supports six fundamental curve types for price discovery:
 
-```solidity
-function deployStrategy(
-    PoolId poolId,
-    bytes calldata encStrike,
-    bytes calldata encLeverage,
-    bytes calldata encVolatility,
-    bytes calldata encFormula
-) external {
-    strategies[poolId] = EncryptedStrategy({
-        strikePrice: FHE.asEuint64(encStrike),
-        leverageFactor: FHE.asEuint64(encLeverage),
-        volatilityParam: FHE.asEuint64(encVolatility),
-        formulaHash: FHE.asEbytes32(encFormula),
-        creator: msg.sender,
-        isActive: true
-    });
-}
+##### Linear Curves
 ```
+P(x) = a × x + b
+```
+Where `a` is the slope and `b` is the intercept, both encrypted.
 
-#### 3.1.2 Confidential Price Discovery
-Prices are calculated using encrypted parameters, ensuring strategy confidentiality:
+##### Exponential Curves
+```
+P(x) = a × e^(b × x) + c
+```
+Enabling exponential growth pricing models.
+
+##### Sigmoid Curves
+```
+P(x) = L / (1 + e^(-k(x-x₀))) + offset
+```
+Ideal for bounded option pricing and s-curve adoption models.
+
+##### Logarithmic Curves
+```
+P(x) = a × ln(x) + b
+```
+Natural for diminishing returns scenarios.
+
+##### Polynomial Curves
+```
+P(x) = Σ(i=0 to n) aᵢ × x^i
+```
+General-purpose curve fitting for complex relationships.
+
+##### Custom Curves
+Arbitrary mathematical functions defined by encrypted formula hashes.
+
+#### 3.1.2 Confidential Price Calculation
+
+The core price calculation algorithm operates entirely on encrypted values:
 
 ```solidity
-function beforeSwap(
-    PoolKey calldata key,
-    IPoolManager.SwapParams calldata params
-) external returns (bytes4, BeforeSwapDelta, uint24) {
-    PoolId poolId = key.toId();
-    FheUint64 confidentialPrice = calculateConfidentialPrice(poolId, params);
-    uint256 finalPrice = FHE.decrypt(confidentialPrice);
-    return (selector, ZERO_DELTA, uint24(finalPrice));
+function calculatePrice(
+    PoolId poolId,
+    uint256 reserves0,
+    uint256 reserves1,
+    bool zeroForOne
+) internal view returns (FheUint64) {
+    CurveParams storage params = poolCurves[poolId];
+    
+    // Convert public reserves to encrypted ratio
+    uint256 ratio = zeroForOne ? 
+        (reserves1 * 1e18) / reserves0 : 
+        (reserves0 * 1e18) / reserves1;
+    FheUint64 encRatio = FHE.asEuint64(ratio);
+    
+    // Perform confidential computation
+    return computeCurvePrice(params, encRatio);
 }
 ```
 
 ### 3.2 Dark Pool Engine
 
-The Dark Pool Engine provides MEV-resistant trading through confidential order processing:
+#### 3.2.1 Confidential Order Model
 
-#### 3.2.1 Encrypted Order Submission
+Orders in the dark pool are represented as:
+
 ```solidity
 struct ConfidentialOrder {
     FheUint64 amountIn;         // Encrypted input amount
     FheUint64 minAmountOut;     // Encrypted minimum output
     FheUint64 maxSlippage;      // Encrypted slippage tolerance
-    FheBytes32 orderType;       // Encrypted order type
+    FheBytes32 orderType;       // Encrypted order classification
     address trader;             // Public trader address
     uint256 deadline;           // Public deadline
 }
 ```
 
-#### 3.2.2 Batch Processing Algorithm
+#### 3.2.2 Batch Execution Algorithm
+
+The uniform price discovery algorithm operates as follows:
+
+1. **Order Collection**: Gather all valid orders within the batch window
+2. **Price Discovery**: Calculate volume-weighted average price confidentially
+3. **Execution**: Fill all orders at the uniform price
+4. **Settlement**: Transfer tokens atomically
+
 ```solidity
-function executeBatch() external {
-    uint256[] memory orderIds = collectActiveOrders();
-    FheUint64 uniformPrice = calculateUniformPrice(orderIds);
+function calculateUniformPrice(uint256[] memory orderIds) 
+    internal view returns (FheUint64) {
+    
+    FheUint64 totalWeightedPrice = FHE.asEuint64(0);
+    FheUint64 totalWeight = FHE.asEuint64(0);
     
     for (uint256 i = 0; i < orderIds.length; i++) {
-        executeOrderAtPrice(orderIds[i], uniformPrice);
+        ConfidentialOrder storage order = orders[orderIds[i]];
+        
+        // Calculate implied price and weight
+        FheUint64 impliedPrice = FHE.div(order.minAmountOut, order.amountIn);
+        FheUint64 weight = order.amountIn;
+        
+        // Accumulate weighted prices confidentially
+        totalWeightedPrice = FHE.add(
+            totalWeightedPrice, 
+            FHE.mul(impliedPrice, weight)
+        );
+        totalWeight = FHE.add(totalWeight, weight);
     }
+    
+    return FHE.div(totalWeightedPrice, totalWeight);
 }
 ```
 
-#### 3.2.3 MEV Resistance
-By processing orders in confidential batches at uniform prices, the system eliminates:
-- Front-running opportunities
-- Sandwich attack vectors
-- Toxic order flow exploitation
+#### 3.2.3 MEV Protection Mechanisms
+
+The dark pool employs several MEV protection strategies:
+
+- **Encrypted Intents**: Trade details hidden until execution
+- **Batch Processing**: Eliminates ordering advantages
+- **Uniform Pricing**: Removes arbitrage opportunities
+- **Confidential Execution**: Front-running becomes impossible
 
 ### 3.3 ZK-Portfolio Weaver
 
-The ZK-Portfolio Weaver enables confidential portfolio composition:
+#### 3.3.1 Portfolio Composition Model
 
-#### 3.3.1 Encrypted Portfolio Structure
+ZK-Portfolios are represented as:
+
 ```solidity
 struct ZKPortfolio {
-    uint256 tokenId;                    // Public portfolio identifier
-    FheUint64[] assetWeights;          // Encrypted allocation weights
-    address[] assetAddresses;          // Public asset addresses
-    FheBytes32 rebalanceStrategy;      // Encrypted rebalancing logic
-    FheUint64 totalValue;              // Encrypted total value
+    uint256 tokenId;                // NFT identifier
+    FheUint64[] assetWeights;       // Encrypted allocation weights
+    address[] assetAddresses;       // Public asset addresses
+    FheBytes32 rebalanceStrategy;   // Encrypted rebalancing logic
+    FheUint64 totalValue;          // Encrypted portfolio value
 }
 ```
 
 #### 3.3.2 Confidential Rebalancing
-Portfolio rebalancing occurs within the encrypted execution environment:
+
+The rebalancing algorithm maintains portfolio weights while preserving confidentiality:
 
 ```solidity
-function rebalancePortfolio(uint256 tokenId) external {
+function executeConfidentialRebalance(uint256 tokenId) internal {
     ZKPortfolio storage portfolio = portfolios[tokenId];
     
     for (uint256 i = 0; i < portfolio.assetAddresses.length; i++) {
-        FheUint64 targetWeight = portfolio.assetWeights[i];
-        FheUint64 currentWeight = calculateCurrentWeight(tokenId, i);
+        // Calculate target allocation using encrypted weights
+        FheUint64 targetAllocation = FHE.mul(
+            portfolio.totalValue, 
+            portfolio.assetWeights[i]
+        );
         
-        if (shouldRebalance(targetWeight, currentWeight)) {
-            executeConfidentialRebalance(tokenId, i, targetWeight);
-        }
+        // Execute rebalancing trades confidentially
+        executeRebalanceTrade(tokenId, i, targetAllocation);
     }
 }
 ```
 
 ---
 
-## 4. Mathematical Framework
+## 4. Security Framework
 
-### 4.1 Custom Curve Mathematics
+### 4.1 Cryptographic Security
 
-#### 4.1.1 Linear Curves
-For simple derivative products:
-```
-price(x) = a × ratio + b
-```
-Where:
-- `a` = encrypted slope coefficient
-- `b` = encrypted intercept
-- `ratio` = reserve ratio
+#### 4.1.1 FHE Security Assumptions
 
-#### 4.1.2 Sigmoid Curves
-For options-like products with bounded values:
-```
-price(x) = L / (1 + e^(-k(x-x₀))) + offset
-```
-Where:
-- `L` = encrypted maximum value
-- `k` = encrypted steepness parameter
-- `x₀` = encrypted midpoint
-- `offset` = encrypted vertical shift
+Chimera's security relies on the following cryptographic assumptions:
 
-#### 4.1.3 Exponential Curves
-For leveraged products:
-```
-price(x) = a × e^(b×ratio) + c
-```
-Where:
-- `a` = encrypted base multiplier
-- `b` = encrypted exponent coefficient
-- `c` = encrypted offset
+- **RLWE Hardness**: Ring Learning With Errors problem remains computationally intractable
+- **Key Security**: Private keys for FHE operations are properly secured
+- **Implementation Security**: Fhenix fhEVM implementation is bug-free
 
-### 4.2 Risk Management Mathematics
+#### 4.1.2 Attack Vectors and Mitigations
 
-#### 4.2.1 Value at Risk (VaR) Calculation
+| Attack Vector | Mitigation Strategy |
+|---------------|-------------------|
+| Parameter Inference | Zero-knowledge execution environment |
+| Timing Attacks | Constant-time operations |
+| Side-channel Analysis | Secure execution environments |
+| Key Extraction | Hardware security modules |
+
+### 4.2 Smart Contract Security
+
+#### 4.2.1 Access Control Framework
+
 ```solidity
-function calculateVaR(
-    FheUint64[] memory positions,
-    FheUint64[] memory correlations,
-    FheUint64 confidenceLevel
-) internal pure returns (FheUint64) {
-    // Confidential VaR calculation using encrypted inputs
-    FheUint64 portfolioVariance = calculatePortfolioVariance(positions, correlations);
-    FheUint64 portfolioStdDev = FHE.sqrt(portfolioVariance);
-    return FHE.mul(portfolioStdDev, confidenceLevel);
-}
-```
-
-#### 4.2.2 Dynamic Leverage Limits
-```solidity
-function calculateMaxLeverage(
-    FheUint64 volatility,
-    FheUint64 liquidity
-) internal pure returns (FheUint64) {
-    FheUint64 baseLimit = FHE.asEuint64(10); // 10x base limit
-    FheUint64 volatilityAdjustment = FHE.div(FHE.asEuint64(100), volatility);
-    FheUint64 liquidityAdjustment = FHE.mul(liquidity, FHE.asEuint64(2));
+contract ChimeraAccessControl {
+    mapping(bytes32 => mapping(address => bool)) public hasRole;
     
-    return FHE.min(
-        FHE.mul(baseLimit, volatilityAdjustment),
-        liquidityAdjustment
-    );
-}
-```
-
----
-
-## 5. Security Analysis
-
-### 5.1 Cryptographic Security
-
-#### 5.1.1 FHE Security Guarantees
-- **Semantic Security**: Encrypted values are computationally indistinguishable
-- **Circuit Privacy**: No intermediate computation values are revealed
-- **Key Security**: Private keys protected by Fhenix network consensus
-
-#### 5.1.2 Threat Model
-**Protected Against:**
-- Parameter extraction attacks
-- Side-channel analysis
-- MEV exploitation
-- Strategy copying
-
-**Assumptions:**
-- Fhenix network security
-- Honest majority of validators
-- Cryptographic primitives security
-
-### 5.2 Smart Contract Security
-
-#### 5.2.1 Access Control
-```solidity
-contract AccessControl {
-    mapping(bytes32 => mapping(address => bool)) private _roles;
+    bytes32 public constant STRATEGY_CREATOR_ROLE = keccak256("STRATEGY_CREATOR");
+    bytes32 public constant POOL_MANAGER_ROLE = keccak256("POOL_MANAGER");
+    bytes32 public constant EMERGENCY_ROLE = keccak256("EMERGENCY");
     
     modifier onlyRole(bytes32 role) {
-        require(hasRole(role, msg.sender), "AccessControl: insufficient privileges");
+        require(hasRole[role][msg.sender], "AccessControl: insufficient permissions");
         _;
-    }
-    
-    function grantRole(bytes32 role, address account) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        _grantRole(role, account);
     }
 }
 ```
 
-#### 5.2.2 Reentrancy Protection
-```solidity
-contract ReentrancyGuard {
-    uint256 private constant _NOT_ENTERED = 1;
-    uint256 private constant _ENTERED = 2;
-    uint256 private _status;
-    
-    modifier nonReentrant() {
-        require(_status != _ENTERED, "ReentrancyGuard: reentrant call");
-        _status = _ENTERED;
-        _;
-        _status = _NOT_ENTERED;
-    }
-}
-```
+#### 4.2.2 Emergency Response System
 
-### 5.3 Economic Security
+Chimera implements a multi-tiered emergency response system:
 
-#### 5.3.1 Incentive Alignment
-- **LPs**: Earn fees from strategy usage
-- **Strategy Creators**: Receive royalties from their strategies
-- **Traders**: Benefit from MEV protection and advanced products
-- **Validators**: Secure the network through staking rewards
+- **Circuit Breakers**: Automatic pausing based on anomaly detection
+- **Emergency Council**: Multi-signature emergency actions
+- **Gradual Recovery**: Phased resumption of operations
+- **Audit Trails**: Comprehensive logging of all emergency actions
 
-#### 5.3.2 Attack Resistance
-- **Flash Loan Attacks**: Prevented through time-based checks
-- **Oracle Manipulation**: Mitigated through oracle-free design
-- **Governance Attacks**: Protected by timelock and multisig controls
+---
+
+## 5. Economic Model
+
+### 5.1 Fee Structure
+
+Chimera employs a multi-layered fee structure:
+
+#### 5.1.1 Base Protocol Fees
+- **Hook Execution**: 0.05% of transaction value
+- **Dark Pool Processing**: 0.10% of order value
+- **Portfolio Management**: 0.25% annual management fee
+
+#### 5.1.2 Dynamic Fee Adjustments
+
+Fees adjust based on:
+- **Network Congestion**: Higher fees during peak usage
+- **Volatility**: Increased fees for high-volatility assets
+- **Complexity**: Additional fees for complex curve types
+- **Privacy Premium**: Enhanced fees for maximum confidentiality
+
+### 5.2 Incentive Alignment
+
+#### 5.2.1 Liquidity Provider Incentives
+
+LPs in Chimera pools receive:
+- **Trading Fees**: Share of swap fees based on position size
+- **Strategy Fees**: Portion of strategy creator fees
+- **Governance Tokens**: CHIMERA token emissions
+- **MEV Protection Premium**: Additional compensation for MEV-resistant liquidity
+
+#### 5.2.2 Strategy Creator Rewards
+
+Strategy creators earn:
+- **Performance Fees**: 20% of excess returns
+- **Management Fees**: 2% annual fee on assets under management
+- **Licensing Fees**: Revenue from strategy licensing
+- **Platform Tokens**: CHIMERA tokens for ecosystem participation
 
 ---
 
@@ -367,231 +347,237 @@ contract ReentrancyGuard {
 ### 6.1 Computational Complexity
 
 #### 6.1.1 FHE Operation Costs
-| Operation | FHE Cost | Regular Cost | Overhead |
-|-----------|----------|--------------|----------|
-| Addition | 1,000 gas | 3 gas | 333x |
-| Multiplication | 5,000 gas | 5 gas | 1,000x |
-| Comparison | 8,000 gas | 3 gas | 2,667x |
 
-#### 6.1.2 Optimization Strategies
-- **Batching**: Combine multiple operations
-- **Caching**: Store computed results
-- **Lazy Evaluation**: Defer expensive computations
-- **Hybrid Execution**: Use FHE only for sensitive operations
+| Operation | Gas Cost Multiplier | Optimization Techniques |
+|-----------|-------------------|------------------------|
+| Addition | 1.2x | Batch operations |
+| Multiplication | 3.5x | Pre-computation caching |
+| Division | 8.0x | Lookup tables |
+| Comparison | 2.1x | Lazy evaluation |
 
-### 6.2 Scalability Considerations
+#### 6.1.2 Scalability Projections
 
-#### 6.2.1 Throughput Targets
-- **Phase 1**: 100 strategies, 1,000 trades/day
-- **Phase 2**: 1,000 strategies, 10,000 trades/day
-- **Phase 3**: 10,000 strategies, 100,000 trades/day
+| Metric | Phase 1 | Phase 2 | Phase 3 |
+|--------|---------|---------|---------|
+| **Daily Transactions** | 1,000 | 10,000 | 100,000 |
+| **Concurrent Strategies** | 100 | 1,000 | 10,000 |
+| **TVL Target** | $10M | $100M | $1B+ |
+| **Average Gas Cost** | 150% of standard | 125% of standard | 110% of standard |
 
-#### 6.2.2 Gas Optimization
-```solidity
-// Optimized batch processing
-function batchProcessOrders(uint256[] calldata orderIds) external {
-    bytes memory batchData = abi.encode(orderIds);
-    bytes memory results = fhenixClient.batchCompute(batchData);
-    
-    // Process results efficiently
-    for (uint256 i = 0; i < orderIds.length; i++) {
-        processOrderResult(orderIds[i], results[i]);
-    }
-}
-```
+### 6.2 Performance Optimizations
 
----
+#### 6.2.1 Gas Optimization Strategies
 
-## 7. Economic Model
+- **Batch Processing**: Multiple operations in single transaction
+- **Lazy Evaluation**: Computation only when required
+- **Result Caching**: Store frequently used calculations
+- **Hybrid Execution**: FHE only for critical parameters
 
-### 7.1 Fee Structure
+#### 6.2.2 Throughput Enhancement
 
-#### 7.1.1 Trading Fees
-- **Base Fee**: 0.05-0.3% of trade volume
-- **Strategy Fee**: 0.1-1% of profits to strategy creator
-- **Protocol Fee**: 10% of total fees to treasury
-
-#### 7.1.2 Dynamic Fee Adjustment
-```solidity
-function calculateDynamicFee(
-    uint256 baseVolume,
-    FheUint64 encryptedVolatility,
-    uint256 liquidityDepth
-) internal pure returns (uint256) {
-    // Volatility adjustment (confidential)
-    uint256 volatilityMultiplier = FHE.decrypt(
-        FHE.div(encryptedVolatility, FHE.asEuint64(100))
-    );
-    
-    // Liquidity adjustment
-    uint256 liquidityMultiplier = liquidityDepth > 1000000 ? 50 : 100;
-    
-    return (baseVolume * volatilityMultiplier * liquidityMultiplier) / 10000;
-}
-```
-
-### 7.2 Token Economics
-
-#### 7.2.1 CHIMERA Token Utility
-- **Governance**: Voting on protocol parameters
-- **Fee Discounts**: Reduced trading fees for holders
-- **Staking Rewards**: Yield from protocol revenue
-- **Strategy Access**: Required for premium features
-
-#### 7.2.2 Value Accrual Mechanisms
-- **Revenue Sharing**: 50% of protocol fees distributed to stakers
-- **Buyback Program**: 25% of fees used for token buybacks
-- **Treasury Growth**: 25% retained for development and expansion
+- **Parallel Processing**: Independent operations executed concurrently
+- **State Channel Integration**: Off-chain computation with on-chain settlement
+- **Layer 2 Deployment**: Utilize optimistic and zk-rollups
+- **Cross-chain Expansion**: Multi-network strategy deployment
 
 ---
 
-## 8. Governance Framework
+## 7. Governance and Decentralization
 
-### 8.1 Governance Structure
+### 7.1 Governance Token (CHIMERA)
 
-#### 8.1.1 Proposal Types
-- **Parameter Changes**: Fee rates, risk limits
-- **Protocol Upgrades**: Smart contract updates
-- **Treasury Decisions**: Fund allocation
-- **Emergency Actions**: Circuit breaker activation
+#### 7.1.1 Token Utility
 
-#### 8.1.2 Voting Mechanism
+- **Protocol Governance**: Voting on protocol upgrades and parameters
+- **Fee Distribution**: Share of protocol revenue
+- **Strategy Curation**: Voting on featured strategies
+- **Emergency Powers**: Participation in emergency response decisions
+
+#### 7.1.2 Governance Mechanisms
+
 ```solidity
 contract ChimeraGovernor {
     struct Proposal {
         uint256 id;
         address proposer;
-        string description;
-        uint256 forVotes;
-        uint256 againstVotes;
-        uint256 startTime;
-        uint256 endTime;
-        bool executed;
+        bytes32 descriptionHash;
+        uint256 startBlock;
+        uint256 endBlock;
+        mapping(uint8 => uint256) voteCounts; // 0=Against, 1=For, 2=Abstain
     }
     
-    function vote(uint256 proposalId, bool support) external {
-        uint256 votingPower = getVotingPower(msg.sender);
-        proposals[proposalId].forVotes += support ? votingPower : 0;
-        proposals[proposalId].againstVotes += support ? 0 : votingPower;
+    function propose(
+        address[] memory targets,
+        uint256[] memory values,
+        bytes[] memory calldatas,
+        string memory description
+    ) public returns (uint256 proposalId) {
+        // Governance proposal logic
     }
 }
 ```
 
-### 8.2 Timelock Mechanism
+### 7.2 Decentralization Roadmap
 
-#### 8.2.1 Execution Delays
-- **Critical Changes**: 7 days minimum delay
-- **Parameter Updates**: 48 hours minimum delay
-- **Emergency Actions**: Immediate execution with guardian approval
+#### 7.2.1 Progressive Decentralization
 
-#### 8.2.2 Guardian Council
-- **Composition**: 5 multisig members
-- **Powers**: Emergency pause, veto malicious proposals
-- **Selection**: Community nomination and voting
+1. **Phase 1**: Core team control with community input
+2. **Phase 2**: DAO formation with delegated governance
+3. **Phase 3**: Full decentralization with on-chain governance
+4. **Phase 4**: Protocol ossification with minimal governance
 
----
+#### 7.2.2 Decentralization Metrics
 
-## 9. Use Cases and Applications
-
-### 9.1 Institutional Use Cases
-
-#### 9.1.1 Hedge Fund Strategy Deployment
-**Scenario**: Citadel wants to deploy a $100M proprietary volatility arbitrage strategy
-
-**Solution**:
-1. Encrypt strategy parameters using Fhenix
-2. Deploy via Encrypted Alpha Hook
-3. Earn fees while preserving IP
-4. Scale without revealing methodology
-
-#### 9.1.2 Asset Manager Portfolio Products
-**Scenario**: BlackRock creates a confidential multi-asset strategy
-
-**Solution**:
-1. Use ZK-Portfolio Weaver for composition
-2. Encrypted rebalancing logic
-3. Tradeable portfolio tokens
-4. Performance tracking without strategy disclosure
-
-### 9.2 Retail Use Cases
-
-#### 9.2.1 MEV-Protected Trading
-**Scenario**: Retail trader wants to swap $10,000 USDC for ETH
-
-**Solution**:
-1. Submit encrypted trade intent to dark pool
-2. Batch with other trades for uniform pricing
-3. Execute without front-running
-4. Receive optimal fill price
-
-#### 9.2.2 Advanced Derivative Trading
-**Scenario**: Sophisticated trader wants ETH call options
-
-**Solution**:
-1. Access oracle-free options via custom curves
-2. Automated time decay and volatility adjustments
-3. No liquidation risk from oracle failures
-4. Direct AMM-based pricing
+- **Token Distribution**: No single entity holds >5% of supply
+- **Validator Diversity**: Geographic and entity distribution
+- **Governance Participation**: >15% token holder participation
+- **Development Contributions**: Multiple independent development teams
 
 ---
 
-## 10. Roadmap and Future Development
+## 8. Risk Assessment
 
-### 10.1 Technical Roadmap
+### 8.1 Technical Risks
 
-#### 10.1.1 Phase 1: Foundation (Months 1-6)
-- Core hook development and testing
-- Fhenix integration and optimization
-- Security audits and formal verification
-- Testnet deployment and validation
+#### 8.1.1 Smart Contract Risks
 
-#### 10.1.2 Phase 2: Expansion (Months 7-12)
-- Mainnet launch with governance
-- Advanced financial products
-- Cross-chain deployment
-- Institutional partnerships
+- **Bug Risk**: Comprehensive testing and formal verification
+- **Upgrade Risk**: Timelock delays and governance oversight
+- **Integration Risk**: Thorough testing with external protocols
+- **Complexity Risk**: Modular design and clear interfaces
 
-#### 10.1.3 Phase 3: Scale (Months 13-24)
-- Layer 2 integration
-- Mobile application
-- Global regulatory compliance
-- Ecosystem expansion
+#### 8.1.2 Cryptographic Risks
 
-### 10.2 Research Directions
+- **FHE Implementation**: Multiple security audits and formal analysis
+- **Key Management**: Hardware security modules and multi-party computation
+- **Quantum Resistance**: Migration plan to post-quantum cryptography
+- **Side-channel Attacks**: Secure execution environments
 
-#### 10.2.1 Advanced Cryptography
-- **ZK-SNARKs Integration**: Enhanced privacy for complex computations
-- **Threshold Cryptography**: Distributed key management
-- **Post-Quantum Security**: Future-proof cryptographic algorithms
+### 8.2 Economic Risks
 
-#### 10.2.2 Financial Innovation
-- **Cross-Asset Strategies**: Multi-chain portfolio management
-- **Dynamic Risk Models**: Real-time risk assessment
-- **Regulatory Technology**: Automated compliance frameworks
+#### 8.2.1 Market Risks
+
+- **Liquidity Risk**: Incentive programs and market making partnerships
+- **Adoption Risk**: User education and institutional partnerships
+- **Competition Risk**: Continuous innovation and ecosystem development
+- **Regulatory Risk**: Compliance framework and legal analysis
+
+#### 8.2.2 Operational Risks
+
+- **Centralization Risk**: Progressive decentralization roadmap
+- **Governance Risk**: Balanced token distribution and participation incentives
+- **Oracle Risk**: Multiple oracle sources and price validation
+- **MEV Risk**: Confidential execution and order protection
+
+---
+
+## 9. Regulatory Considerations
+
+### 9.1 Compliance Framework
+
+#### 9.1.1 Regulatory Analysis
+
+Chimera operates within existing regulatory frameworks by:
+
+- **Transparency Where Required**: Public audit trails for compliance
+- **Privacy Where Permitted**: Confidential execution within legal bounds
+- **Jurisdiction Awareness**: Adaptive compliance based on user location
+- **Regulatory Engagement**: Proactive dialogue with regulatory bodies
+
+#### 9.1.2 Compliance Tools
+
+```solidity
+contract ComplianceLayer {
+    mapping(address => bytes32) public kycHash;
+    mapping(address => bool) public sanctionsList;
+    mapping(bytes32 => bool) public jurisdictionAllowed;
+    
+    function validateTransaction(
+        address user,
+        bytes32 jurisdiction,
+        uint256 amount
+    ) external view returns (bool) {
+        return kycHash[user] != bytes32(0) && 
+               !sanctionsList[user] && 
+               jurisdictionAllowed[jurisdiction] &&
+               amount <= getTransactionLimit(jurisdiction);
+    }
+}
+```
+
+### 9.2 Future Regulatory Adaptation
+
+#### 9.2.1 Modular Compliance
+
+Chimera's modular architecture enables:
+
+- **Jurisdiction-specific Modules**: Customized compliance per region
+- **Upgradeable Compliance**: Adaptation to new regulations
+- **Selective Disclosure**: Confidentiality with audit capabilities
+- **Cross-border Coordination**: Multi-jurisdiction compliance frameworks
+
+---
+
+## 10. Future Research Directions
+
+### 10.1 Advanced Cryptography
+
+#### 10.1.1 Post-Quantum Cryptography
+
+Research initiatives include:
+
+- **Lattice-based FHE**: Quantum-resistant homomorphic encryption
+- **Multilinear Maps**: Advanced cryptographic constructions
+- **Zero-knowledge SNARKs**: Enhanced privacy-preserving proofs
+- **Secure Multi-party Computation**: Distributed confidential computing
+
+#### 10.1.2 Cryptographic Optimizations
+
+- **Hardware Acceleration**: Specialized FHE processing units
+- **Algorithmic Improvements**: More efficient homomorphic operations
+- **Hybrid Approaches**: Combining multiple cryptographic techniques
+- **Threshold Cryptography**: Distributed key management systems
+
+### 10.2 Protocol Enhancements
+
+#### 10.2.1 Advanced Financial Products
+
+- **Exotic Options**: Barrier, Asian, and rainbow options
+- **Structured Products**: Principal-protected notes and synthetic instruments
+- **Credit Derivatives**: On-chain credit default swaps and bonds
+- **Insurance Products**: Parametric and catastrophe insurance
+
+#### 10.2.2 Cross-Protocol Integration
+
+- **DeFi Composability**: Integration with lending, borrowing, and yield farming protocols
+- **Traditional Finance Bridges**: Connection to TradFi systems and markets
+- **Cross-chain Interoperability**: Multi-blockchain strategy deployment
+- **Real-world Assets**: Tokenization and on-chain representation
 
 ---
 
 ## 11. Conclusion
 
-Chimera Protocol represents a paradigm shift in decentralized finance, enabling the first truly confidential automated market maker. By solving the fundamental transparency paradox that excludes institutional capital from DeFi, Chimera opens a $4.5 trillion market opportunity while providing enhanced security and functionality for all users.
+Chimera Protocol represents a paradigm shift in decentralized finance, enabling institutional-grade financial engineering while preserving privacy and preventing value extraction. Through the innovative combination of Uniswap V4 hooks and Fhenix confidential computing, Chimera solves fundamental barriers to institutional DeFi adoption.
 
-The combination of Fhenix's confidential computing, Uniswap V4's programmable hooks, and innovative financial engineering creates a platform that preserves the decentralized ethos of DeFi while meeting the sophisticated requirements of institutional finance.
+The protocol's three core innovations—Encrypted Alpha Hooks, Dark Pool Engine, and ZK-Portfolio Weaver—work synergistically to create a comprehensive confidential financial platform. With robust security frameworks, economic incentives, and governance mechanisms, Chimera is positioned to bridge the gap between traditional finance and decentralized systems.
 
-As the first protocol to enable confidential strategy deployment, MEV-resistant trading, and zero-knowledge portfolio management, Chimera is positioned to become the foundational infrastructure for the next generation of decentralized finance.
+As the DeFi ecosystem continues to mature, protocols like Chimera will play a crucial role in attracting institutional capital and sophisticated trading strategies to on-chain markets. The successful implementation of confidential computing in AMMs opens new possibilities for financial innovation while maintaining the core principles of decentralization and permissionless access.
 
 ---
 
 ## References
 
-1. Fhenix Protocol Documentation. "Fully Homomorphic Encryption for Blockchain." 2024.
-2. Uniswap V4 Whitepaper. "Hooks: Programmable Liquidity." 2023.
-3. Buterin, V. "Privacy in Ethereum." Ethereum Foundation, 2023.
-4. Daian, P. et al. "Flash Boys 2.0: Frontrunning in Decentralized Exchanges." 2020.
-5. Gentry, C. "Fully Homomorphic Encryption Using Ideal Lattices." 2009.
+1. Gentry, C. (2009). *Fully homomorphic encryption using ideal lattices*. STOC '09.
+2. Adams, H., et al. (2021). *Uniswap v3 Core*. Uniswap Labs.
+3. Brakerski, Z., & Vaikuntanathan, V. (2014). *Efficient fully homomorphic encryption from (standard) LWE*. SIAM Journal on Computing.
+4. Fhenix Protocol. (2024). *fhEVM: Fully Homomorphic Encryption for Ethereum Virtual Machine*.
+5. Daian, P., et al. (2020). *Flash Boys 2.0: Frontrunning in Decentralized Exchanges*. IEEE S&P.
+6. Qin, K., Zhou, L., & Gervais, A. (2022). *Quantifying blockchain extractable value*. IMC '22.
 
 ---
 
-**Authors**: Chimera Protocol Team  
-**Version**: 1.0  
-**Date**: 2024  
-**Contact**: whitepaper@chimera.finance
+**Authors:** Chimera Protocol Research Team  
+**Version:** 1.0  
+**Date:** 2024  
+**License:** MIT
