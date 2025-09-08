@@ -57,16 +57,21 @@ Chimera utilizes the following encrypted primitives:
 
 #### 2.2.1 Hook Lifecycle
 
-Chimera hooks integrate with Uniswap V4's lifecycle events:
+Chimera hooks integrate with Uniswap V4's complete lifecycle events:
 
 ```solidity
 function getHookPermissions() public pure returns (Hooks.Permissions memory) {
     return Hooks.Permissions({
-        beforeInitialize: true,    // Setup encrypted parameters
-        afterInitialize: true,     // Validate configuration
-        beforeSwap: true,          // Custom price calculation
-        afterSwap: true,           // Update internal state
-        // Other hooks as needed
+        beforeInitialize: true,     // Setup encrypted curve parameters
+        afterInitialize: true,      // Validate curve configuration
+        beforeAddLiquidity: true,   // Validate curve constraints
+        afterAddLiquidity: true,    // Update curve state + return BalanceDelta
+        beforeRemoveLiquidity: true, // Ensure curve integrity
+        afterRemoveLiquidity: true,  // Maintain curve + return BalanceDelta
+        beforeSwap: true,           // Custom price + return BeforeSwapDelta
+        afterSwap: true,            // Update state + return fee adjustment
+        beforeDonate: false,        // Not used in curve implementation
+        afterDonate: false          // Not used in curve implementation
     });
 }
 ```
@@ -77,11 +82,25 @@ Each Chimera pool is configured with:
 
 ```solidity
 struct ChimeraPoolConfig {
-    CurveType curveType;
-    FheUint64[] encryptedCoefficients;
-    FheBytes32 formulaHash;
-    uint256 maxLeverage;
-    uint256 volatilityFactor;
+    CurveType curveType;                // Curve type (Linear, Exponential, etc.)
+    FheUint64[] encryptedCoefficients; // Encrypted curve parameters
+    FheBytes32 formulaHash;            // Formula identification hash
+    uint256 maxLeverage;               // Maximum leverage allowed
+    uint256 volatilityFactor;          // Volatility adjustment factor (basis points)
+    uint256 minLiquidity;              // Minimum liquidity for curve integrity
+    uint256 maxSlippage;               // Maximum slippage allowed (basis points)
+    uint256 timeDecayRate;             // Time decay rate for options (basis points/day)
+    bool isActive;                     // Curve activation status
+}
+
+struct CurveState {
+    uint256 lastUpdateTime;            // Last state update timestamp
+    uint256 totalLiquidity;            // Total liquidity in the pool
+    uint256 reserves0;                 // Token0 reserves
+    uint256 reserves1;                 // Token1 reserves
+    uint256 volume24h;                 // 24-hour trading volume
+    uint256 feeAccumulated;            // Accumulated fees
+    bool isActive;                     // State activation status
 }
 ```
 
@@ -91,7 +110,48 @@ struct ChimeraPoolConfig {
 
 ### 3.1 Custom Curve Engine
 
-#### 3.1.1 Mathematical Curve Types
+#### 3.1.1 Delta Return System
+
+Chimera Protocol implements a sophisticated delta return system that modifies liquidity and swap behaviors based on curve mathematics:
+
+**BalanceDelta for Liquidity Operations:**
+```solidity
+function afterAddLiquidity(...) external override returns (bytes4, BalanceDelta) {
+    // Calculate curve-specific adjustments
+    BalanceDelta curveAdjustment = _calculateLiquidityAdjustment(poolId, curve, liquidityDelta);
+    
+    // Exponential curves: boost efficiency by 1%
+    // Sigmoid curves: apply bounded adjustments
+    // Linear curves: no modification needed
+    
+    return (BaseHook.afterAddLiquidity.selector, curveAdjustment);
+}
+```
+
+**BeforeSwapDelta for Swap Modifications:**
+```solidity
+function beforeSwap(...) external override returns (bytes4, BeforeSwapDelta, uint24) {
+    // Calculate custom price with encrypted parameters
+    FheUint64 curvePrice = _calculateCurvePrice(poolId, reserves0, reserves1, zeroForOne);
+    
+    // Apply curve-specific swap adjustments
+    BeforeSwapDelta swapAdjustment = _calculateSwapAdjustment(poolId, params, finalPrice);
+    
+    return (BaseHook.beforeSwap.selector, swapAdjustment, customFeeOverride);
+}
+```
+
+**Fee Adjustments for Risk Management:**
+```solidity
+function afterSwap(...) external override returns (bytes4, int128) {
+    // Apply volatility-based fee adjustments
+    int128 feeAdjustment = _calculateFeeAdjustment(poolId, params, delta);
+    
+    return (BaseHook.afterSwap.selector, feeAdjustment);
+}
+```
+
+#### 3.1.2 Mathematical Curve Types
 
 Chimera supports six fundamental curve types for price discovery:
 

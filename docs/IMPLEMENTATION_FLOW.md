@@ -107,11 +107,25 @@ interface ICustomCurve {
     enum CurveType { Linear, Exponential, Sigmoid, Logarithmic, Polynomial, Custom }
     
     struct CurveParams {
-        CurveType curveType;
-        FheUint64[] encryptedCoefficients;
-        FheBytes32 formulaHash;
-        uint256 maxLeverage;
-        uint256 volatilityFactor;
+        CurveType curveType;                // Curve type (Linear, Exponential, etc.)
+        FheUint64[] encryptedCoefficients; // Encrypted curve parameters
+        FheBytes32 formulaHash;            // Formula identification hash
+        uint256 maxLeverage;               // Maximum leverage allowed
+        uint256 volatilityFactor;          // Volatility adjustment factor (basis points)
+        uint256 minLiquidity;              // Minimum liquidity for curve integrity
+        uint256 maxSlippage;               // Maximum slippage allowed (basis points)
+        uint256 timeDecayRate;             // Time decay rate for options (basis points/day)
+        bool isActive;                     // Curve activation status
+    }
+    
+    struct CurveState {
+        uint256 lastUpdateTime;            // Last state update timestamp
+        uint256 totalLiquidity;            // Total liquidity in the pool
+        uint256 reserves0;                 // Token0 reserves
+        uint256 reserves1;                 // Token1 reserves
+        uint256 volume24h;                 // 24-hour trading volume
+        uint256 feeAccumulated;            // Accumulated fees
+        bool isActive;                     // State activation status
     }
     
     function setCurveParameters(...) external;
@@ -140,9 +154,39 @@ contract CustomCurveHook is BaseHook, ICustomCurve {
     using CustomCurveEngine for CurveParams;
     
     mapping(PoolId => CurveParams) public poolCurves;
+    mapping(PoolId => CurveState) public curveStates;
     
-    function beforeSwap(...) external override returns (...) {
-        // Custom price calculation using encrypted parameters
+    // ✅ COMPLETE HOOK PERMISSIONS
+    function getHookPermissions() public pure override returns (Hooks.Permissions memory) {
+        return Hooks.Permissions({
+            beforeInitialize: true,     // Setup curve parameters
+            afterInitialize: true,      // Validate configuration
+            beforeAddLiquidity: true,   // ✅ Curve constraint validation
+            afterAddLiquidity: true,    // ✅ State updates + BalanceDelta
+            beforeRemoveLiquidity: true, // ✅ Integrity validation
+            afterRemoveLiquidity: true,  // ✅ Maintenance + BalanceDelta
+            beforeSwap: true,           // ✅ Custom price + BeforeSwapDelta
+            afterSwap: true,            // ✅ State updates + fee adjustment
+            beforeDonate: false,
+            afterDonate: false
+        });
+    }
+    
+    // ✅ DELTA RETURN FUNCTIONS
+    function afterAddLiquidity(...) external override returns (bytes4, BalanceDelta) {
+        // Update curve state and return liquidity adjustments
+    }
+    
+    function afterRemoveLiquidity(...) external override returns (bytes4, BalanceDelta) {
+        // Maintain curve integrity and return removal adjustments
+    }
+    
+    function beforeSwap(...) external override returns (bytes4, BeforeSwapDelta, uint24) {
+        // Custom price calculation with swap modifications
+    }
+    
+    function afterSwap(...) external override returns (bytes4, int128) {
+        // State updates with fee adjustments
     }
 }
 ```

@@ -1,8 +1,10 @@
-# Chimera Protocol - Developer Guide
+# Chimera Protocol - Developer Guide & API Reference
 
-## 🚀 Complete Developer Documentation & API Reference
+## 🚀 Complete Developer Documentation
 
-Welcome to Chimera Protocol! This guide provides everything you need to build on the world's first confidential AMM.
+Welcome to Chimera Protocol! This guide provides everything you need to build on the world's first confidential AMM using pure FHE implementation.
+
+> **Note**: For detailed step-by-step implementation workflow, see [IMPLEMENTATION_FLOW.md](./IMPLEMENTATION_FLOW.md)
 
 ---
 
@@ -166,12 +168,33 @@ interface ICustomCurve {
     enum CurveType { Linear, Exponential, Sigmoid, Logarithmic, Polynomial, Custom }
     
     struct CurveParams {
-        CurveType curveType;
-        FheUint64[] encryptedCoefficients;
-        FheBytes32 formulaHash;
-        uint256 maxLeverage;
-        uint256 volatilityFactor;
+        CurveType curveType;                // Curve type (Linear, Exponential, etc.)
+        FheUint64[] encryptedCoefficients; // Encrypted curve parameters
+        FheBytes32 formulaHash;            // Formula identification hash
+        uint256 maxLeverage;               // Maximum leverage allowed
+        uint256 volatilityFactor;          // Volatility adjustment factor (basis points)
+        uint256 minLiquidity;              // Minimum liquidity for curve integrity
+        uint256 maxSlippage;               // Maximum slippage allowed (basis points)
+        uint256 timeDecayRate;             // Time decay rate for options (basis points/day)
+        bool isActive;                     // Curve activation status
     }
+
+    struct CurveState {
+        uint256 lastUpdateTime;            // Last state update timestamp
+        uint256 totalLiquidity;            // Total liquidity in the pool
+        uint256 reserves0;                 // Token0 reserves
+        uint256 reserves1;                 // Token1 reserves
+        uint256 volume24h;                 // 24-hour trading volume
+        uint256 feeAccumulated;            // Accumulated fees
+        bool isActive;                     // State activation status
+    }
+
+    // ✅ NEW: Enhanced events for delta operations
+    event CurveParametersSet(PoolId indexed poolId, CurveType curveType);
+    event CurveComputed(PoolId indexed poolId, uint256 timestamp);
+    event CurveStateUpdated(PoolId indexed poolId, uint256 totalLiquidity);
+    event LiquidityAdjusted(PoolId indexed poolId, int256 adjustment);
+    event SwapAdjusted(PoolId indexed poolId, int256 deltaAdjustment);
     
     function setCurveParameters(
         PoolId poolId,
@@ -188,6 +211,60 @@ interface ICustomCurve {
         uint256 reserves1,
         bool zeroForOne
     ) external view returns (FheUint64);
+
+    // ✅ NEW: Complete hook functions with delta returns
+    function beforeAddLiquidity(
+        address sender,
+        PoolKey calldata key,
+        IPoolManager.ModifyLiquidityParams calldata params,
+        bytes calldata hookData
+    ) external returns (bytes4);
+
+    function afterAddLiquidity(
+        address sender,
+        PoolKey calldata key,
+        IPoolManager.ModifyLiquidityParams calldata params,
+        BalanceDelta delta,
+        bytes calldata hookData
+    ) external returns (bytes4, BalanceDelta);
+
+    function beforeRemoveLiquidity(
+        address sender,
+        PoolKey calldata key,
+        IPoolManager.ModifyLiquidityParams calldata params,
+        bytes calldata hookData
+    ) external returns (bytes4);
+
+    function afterRemoveLiquidity(
+        address sender,
+        PoolKey calldata key,
+        IPoolManager.ModifyLiquidityParams calldata params,
+        BalanceDelta delta,
+        bytes calldata hookData
+    ) external returns (bytes4, BalanceDelta);
+
+    function beforeSwap(
+        address sender,
+        PoolKey calldata key,
+        IPoolManager.SwapParams calldata params,
+        bytes calldata hookData
+    ) external returns (bytes4, BeforeSwapDelta, uint24);
+
+    function afterSwap(
+        address sender,
+        PoolKey calldata key,
+        IPoolManager.SwapParams calldata params,
+        BalanceDelta delta,
+        bytes calldata hookData
+    ) external returns (bytes4, int128);
+
+    function getCurveState(PoolId poolId) external view returns (CurveState memory);
+
+    function validateCurveParameters(
+        CurveType curveType,
+        bytes[] calldata encryptedCoefficients,
+        uint256 maxLeverage
+    ) external pure returns (bool);
 }
 ```
 

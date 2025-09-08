@@ -4,6 +4,8 @@
 
 Chimera Protocol is the world's first confidential automated market maker (AMM) that combines Uniswap V4's programmable hooks with Fhenix's fully homomorphic encryption (FHE) to enable institutional-grade financial strategy deployment while preserving intellectual property.
 
+> **Implementation Status**: Pure FHE implementation with optimized gas costs and complete mathematical function support. See [FHE_SOLUTIONS_PLAN.md](./FHE_SOLUTIONS_PLAN.md) for technical details.
+
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                         Chimera Protocol                            │
@@ -41,11 +43,19 @@ CustomCurveHook.sol
 │   ├── FheUint64 coefficients[]
 │   ├── FheBytes32 formulaHash
 │   ├── Volatility adjustments
-│   └── Leverage controls
+│   ├── Leverage controls
+│   ├── Minimum liquidity constraints
+│   └── Maximum slippage protection
+├── Delta Return System
+│   ├── BalanceDelta for liquidity operations
+│   ├── BeforeSwapDelta for swap modifications
+│   ├── Fee adjustments for volatility
+│   └── Curve state synchronization
 └── Price Computation Engine
     ├── Confidential calculation
     ├── Gas-optimized algorithms
-    └── Real-time parameter updates
+    ├── Real-time parameter updates
+    └── Curve integrity validation
 ```
 
 #### 1.2 Encrypted Alpha Hook
@@ -70,34 +80,55 @@ EncryptedAlphaHook.sol
 
 #### 1.3 Hook Integration Framework
 ```solidity
-// Unified hook architecture
-contract BaseChimeraHook is BaseHook {
-    // Standard Uniswap V4 hook permissions
+// Complete custom curve hook architecture with delta returns
+contract CustomCurveHook is BaseHook {
+    // Complete Uniswap V4 hook permissions for custom curves
     function getHookPermissions() public pure override returns (Hooks.Permissions memory) {
         return Hooks.Permissions({
-            beforeInitialize: true,    // Pool setup with encrypted params
-            afterInitialize: true,     // Post-setup validation
-            beforeAddLiquidity: true,  // LP position validation
-            afterAddLiquidity: true,   // Update internal state
-            beforeRemoveLiquidity: true, // Exit validation
-            afterRemoveLiquidity: true,  // Cleanup operations
-            beforeSwap: true,          // Pre-swap price calculation
-            afterSwap: true,           // Post-swap state updates
-            beforeDonate: false,       // Not used
-            afterDonate: false         // Not used
+            beforeInitialize: true,     // Pool setup with encrypted curve params
+            afterInitialize: true,      // Post-setup validation
+            beforeAddLiquidity: true,   // ✅ Curve constraint validation
+            afterAddLiquidity: true,    // ✅ Curve state updates + BalanceDelta
+            beforeRemoveLiquidity: true, // ✅ Curve integrity validation
+            afterRemoveLiquidity: true,  // ✅ Curve maintenance + BalanceDelta
+            beforeSwap: true,           // ✅ Custom price + BeforeSwapDelta
+            afterSwap: true,            // ✅ State updates + fee adjustment
+            beforeDonate: false,        // Not used
+            afterDonate: false          // Not used
         });
     }
     
-    // Modular hook composition
-    mapping(PoolId => HookConfig) public hookConfigs;
+    // Curve state management
+    mapping(PoolId => CurveParams) public poolCurves;
+    mapping(PoolId => CurveState) public curveStates;
     
-    struct HookConfig {
-        bool useCustomCurve;
-        bool useEncryptedAlpha;
-        bool useDarkPool;
-        bool useRiskManagement;
-        address[] enabledModules;
+    struct CurveParams {
+        CurveType curveType;                // Curve type (Linear, Exponential, etc.)
+        FheUint64[] encryptedCoefficients; // Encrypted curve parameters
+        FheBytes32 formulaHash;            // Formula identification hash
+        uint256 maxLeverage;               // Maximum leverage allowed
+        uint256 volatilityFactor;          // Volatility adjustment factor (basis points)
+        uint256 minLiquidity;              // Minimum liquidity for curve integrity
+        uint256 maxSlippage;               // Maximum slippage allowed (basis points)
+        uint256 timeDecayRate;             // Time decay rate for options (basis points/day)
+        bool isActive;                     // Curve activation status
     }
+    
+    struct CurveState {
+        uint256 lastUpdateTime;            // Last state update timestamp
+        uint256 totalLiquidity;            // Total liquidity in the pool
+        uint256 reserves0;                 // Token0 reserves
+        uint256 reserves1;                 // Token1 reserves
+        uint256 volume24h;                 // 24-hour trading volume
+        uint256 feeAccumulated;            // Accumulated fees
+        bool isActive;                     // State activation status
+    }
+    
+    // ✅ DELTA RETURN FUNCTIONS
+    function afterAddLiquidity(...) external override returns (bytes4, BalanceDelta);
+    function afterRemoveLiquidity(...) external override returns (bytes4, BalanceDelta);
+    function beforeSwap(...) external override returns (bytes4, BeforeSwapDelta, uint24);
+    function afterSwap(...) external override returns (bytes4, int128);
 }
 ```
 

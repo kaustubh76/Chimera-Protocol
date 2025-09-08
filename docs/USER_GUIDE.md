@@ -104,11 +104,13 @@ Create complex financial products using programmable bonding curves that were pr
 
 #### 🎯 **Custom Strategies**
 Create pools with secret parameters that determine how prices move:
-- **Linear**: Steady price changes
-- **Exponential**: Accelerating growth patterns
-- **Sigmoid**: Bounded growth (perfect for options)
-- **Logarithmic**: Diminishing returns curves
-- **Polynomial**: Complex multi-factor relationships
+- **Linear**: Steady price changes with configurable slope and intercept
+- **Exponential**: Accelerating growth patterns with momentum adjustments
+- **Sigmoid**: Bounded growth (perfect for options) with automatic bounds
+- **Logarithmic**: Diminishing returns curves with minimum liquidity protection
+- **Polynomial**: Complex multi-factor relationships with domain validation
+- **Smart Liquidity**: Automatic adjustments based on curve type and market conditions
+- **Dynamic Fees**: Volatility-based fee adjustments for optimal pricing
 
 #### 🌑 **Dark Pool Trading**
 Submit encrypted trading orders that get processed fairly:
