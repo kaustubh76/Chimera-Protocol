@@ -1,14 +1,40 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Chimera Protocol Phase 2 - UI Demo
 
-## Getting Started
+## 🎯 Interactive Demo Overview
 
-First, run the development server:
+This UI demo provides a **fully functional interface** for interacting with the Chimera Protocol Phase 2 contracts deployed on Sepolia testnet. Unlike static demos, this interface connects to **real smart contracts** and displays **live data**.
 
+## ✨ Features
+
+### 🔗 **Live Contract Integration**
+- **Real-time Data**: Displays actual contract state from Sepolia
+- **Interactive Testing**: Execute contract functions directly from the UI
+- **Transaction Support**: Submit transactions and track confirmations
+- **Error Handling**: Graceful handling of network and contract errors
+
+### 💼 **Wallet Integration**
+- **Multiple Wallets**: MetaMask, WalletConnect, Coinbase Wallet
+- **Network Detection**: Automatic Sepolia network detection
+- **Account Management**: Connect/disconnect functionality
+- **Transaction Signing**: Secure transaction signing flow
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Node.js v18+ and npm
+- A Web3 wallet (MetaMask recommended)
+- Sepolia testnet ETH for testing
+
+### Installation & Setup
 ```bash
+# Install dependencies
+npm install
+
+# Copy environment template (if needed)
+cp .env.example .env.local
+
+# Start development server
 npm run dev
-# or
-yarn dev
-# or
 pnpm dev
 # or
 bun dev
