@@ -1,0 +1,48 @@
+{
+  "name": "@chimera-protocol/core",
+  "version": "1.0.0",
+  "description": "World's first confidential AMM using Fhenix FHE and Uniswap V4 hooks",
+  "scripts": {
+    "build": "forge build",
+    "test": "forge test",
+    "test:unit": "forge test --match-path 'test/unit/**/*.t.sol'",
+    "test:integration": "forge test --match-path 'test/integration/**/*.t.sol'",
+    "test:curves": "forge test --match-path 'test/unit/libraries/FHECurveEngine.t.sol'",
+    "test:gas": "forge test --gas-report",
+    "test:coverage": "forge coverage",
+    "test:fuzz": "forge test --fuzz-runs 10000",
+    "deploy:local": "forge script script/Deploy.s.sol --rpc-url localhost --broadcast",
+    "deploy:fhenix": "forge script script/Deploy.s.sol --rpc-url https://api.helium.fhenix.zone --broadcast --verify",
+    "verify": "forge verify-contract",
+    "clean": "forge clean",
+    "fmt": "forge fmt",
+    "lint": "forge fmt --check",
+    "snapshot": "forge snapshot",
+    "anvil": "anvil",
+    "setup": "forge install && git submodule update --init --recursive"
+  },
+  "dependencies": {
+    "@fhenixprotocol/contracts": "^0.1.0"
+  },
+  "keywords": [
+    "chimera",
+    "fhe",
+    "confidential",
+    "amm",
+    "uniswap",
+    "v4",
+    "hooks",
+    "defi",
+    "privacy"
+  ],
+  "author": "Chimera Protocol Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ChimeraProtocol/chimera-core.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ChimeraProtocol/chimera-core/issues"
+  },
+  "homepage": "https://chimera.finance"
+}

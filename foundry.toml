@@ -1,0 +1,63 @@
+[profile.default]
+src = "contracts"
+out = "out"
+libs = ["lib"]
+test = "test"
+cache_path = "cache_forge"
+
+# Solidity compiler settings
+solc_version = "0.8.26"
+optimizer = true
+optimizer_runs = 1000000
+via_ir = true
+bytecode_hash = "none"
+cbor_metadata = false
+
+# EVM version for compatibility
+evm_version = "cancun"
+
+# Gas reporting
+gas_reports = ["*"]
+gas_reports_ignore = ["test/**/*"]
+
+# Fuzz testing configuration  
+fuzz = { runs = 1000, max_test_rejects = 100000 }
+invariant = { runs = 256, depth = 15, fail_on_revert = false }
+
+# Formatter settings
+fmt = { line_length = 100, tab_width = 4, bracket_spacing = true }
+
+# Remappings for dependencies
+remappings = [
+    "@openzeppelin/=lib/openzeppelin-contracts/",
+    "@uniswap/v4-core/=lib/v4-core/",
+    "@uniswap/v4-periphery/=lib/v4-periphery/",
+    "@fhenixprotocol/cofhe-contracts/=lib/cofhe-contracts/contracts/",
+    "forge-std/=lib/openzeppelin-contracts/lib/forge-std/src/",
+    "solmate/=lib/solmate/",
+    "ds-test/=lib/openzeppelin-contracts/lib/forge-std/lib/ds-test/src/"
+]
+
+# RPC endpoints
+[rpc_endpoints]
+mainnet = "${MAINNET_RPC_URL}"
+sepolia = "${SEPOLIA_RPC_URL}"
+fhenixHelium = "https://api.helium.fhenix.zone"
+localhost = "http://127.0.0.1:8545"
+
+# Etherscan API keys for verification
+[etherscan]
+mainnet = { key = "${ETHERSCAN_API_KEY}" }
+sepolia = { key = "${ETHERSCAN_API_KEY}" }
+
+# Profile for testing with more aggressive optimization
+[profile.test]
+optimizer = true
+optimizer_runs = 10000
+fuzz = { runs = 10000 }
+
+# Profile for production deployment
+[profile.production] 
+optimizer = true
+optimizer_runs = 1000000
+via_ir = true
